@@ -19,7 +19,14 @@ import {
   type NodeTypes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Home, ScrollText } from 'lucide-react';
+import {
+  Home,
+  ScrollText,
+  Play,
+  WandSparkles,
+  LayoutGrid,
+  Trash2,
+} from 'lucide-react';
 import { BlockNode } from '@/components/BlockNode';
 import { BlockPalette } from '@/components/BlockPalette';
 import { RunBlockPanel } from '@/components/RunBlockPanel';
@@ -35,6 +42,7 @@ import { topologicalOrder, getEntryInputs, getInputSource } from '@/lib/workflow
 import { EntryInputsModal, type EntryInputField } from '@/components/EntryInputsModal';
 import { useFlowRunStore } from '@/store/flowRunStore';
 import { useExecutionLog } from '@/store/executionLog';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const nodeTypes: NodeTypes = { block: BlockNode };
 
@@ -130,6 +138,7 @@ function FlowCanvas({
   setSelectedNodeIds,
   removeNodes,
   onNodeDoubleClick,
+  theme,
 }: {
   nodes: Node[];
   setNodes: (u: Node[] | ((prev: Node[]) => Node[])) => void;
@@ -145,8 +154,13 @@ function FlowCanvas({
   setSelectedNodeIds: (ids: string[]) => void;
   removeNodes: (ids: string[]) => void;
   onNodeDoubleClick: (event: React.MouseEvent, node: Node) => void;
+  theme: 'dark' | 'light';
 }) {
   const { screenToFlowPosition } = useReactFlow();
+  const isDark = theme === 'dark';
+  const majorGrid = isDark ? '#314053' : '#cbd5e1';
+  const minorGrid = isDark ? '#1d2838' : '#e2e8f0';
+  const lineColor = isDark ? '#22c55e' : '#15803d';
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -263,28 +277,30 @@ function FlowCanvas({
         onPaneClick={handlePaneClick}
         nodeTypes={nodeTypes}
         fitView
-        className="bg-zinc-950"
+        className="bg-app"
         snapToGrid
         snapGrid={[16, 16]}
         defaultEdgeOptions={{ type: 'default' }}
-        connectionLineStyle={{ stroke: '#10b981', strokeWidth: 2 }}
+        connectionLineStyle={{ stroke: lineColor, strokeWidth: 2 }}
       >
-        <Background color="#27272a" gap={16} size={1} />
-        <Background color="#3f3f46" gap={80} size={1} />
-        <Controls className="!bg-zinc-800 !border-zinc-700" />
+        <Background color={minorGrid} gap={16} size={0.8} />
+        <Background color={majorGrid} gap={80} size={1.15} />
+        <Controls className="!border-app !bg-app-surface !text-app-soft" />
         <MiniMap
-          nodeColor="#10b981"
-          maskColor="rgb(24,24,27,0.8)"
-          className="!bg-zinc-900 !border-zinc-700"
+          nodeColor={lineColor}
+          maskColor={isDark ? 'rgba(2,6,23,0.78)' : 'rgba(226,232,240,0.72)'}
+          className="!border-app !bg-app-surface"
         />
-        <Panel position="top-center" className="flex gap-2">
-          <span className="text-zinc-500 text-xs">Drag from palette or click block to add • Right-click: Run or Remove • Del to remove</span>
+        <Panel position="top-center" className="rounded-full border border-app bg-app-surface px-3 py-1.5 shadow-sm backdrop-blur">
+          <span className="text-app-soft text-xs">
+            Drag to add blocks, connect outputs to inputs, double-click nodes to run
+          </span>
         </Panel>
         {nodes.length === 0 && (
-          <Panel position="top-left" className="mt-24 ml-24 max-w-sm">
-            <div className="rounded-xl border border-zinc-700 bg-zinc-900/90 p-4 text-zinc-400 text-sm shadow-lg">
-              <p className="font-medium text-zinc-200">Canvas empty</p>
-              <p className="mt-1">Drag blocks from the palette or click a block to add it here.</p>
+          <Panel position="top-left" className="mt-20 ml-8 max-w-sm">
+            <div className="rounded-2xl border border-app bg-app-surface p-4 text-app-soft text-sm shadow-lg backdrop-blur">
+              <p className="font-semibold text-app-fg">Start your flow</p>
+              <p className="mt-1">Drag blocks from the left panel or click a block to place it on canvas.</p>
             </div>
           </Panel>
         )}
@@ -304,14 +320,12 @@ function FlowCanvas({
 export default function DashboardPage() {
   const [nodes, setNodes, onNodesChange] = useNodesState(DEFAULT_NODES);
   const [edges, setEdges, onEdgesChange] = useEdgesState(DEFAULT_EDGES);
-  const [hydrated, setHydrated] = useState(false);
 
   // Load from localStorage only after hydration to avoid mismatch
   useEffect(() => {
     const saved = loadFlow();
     setNodes(saved.nodes);
     setEdges(saved.edges);
-    setHydrated(true);
   }, [setNodes, setEdges]);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const [runPanelNode, setRunPanelNode] = useState<RunPanelState>(null);
@@ -324,6 +338,7 @@ export default function DashboardPage() {
   const getOutput = useFlowRunStore((s) => s.getOutput);
   const clearRunCache = useFlowRunStore((s) => s.clearAll);
   const { isVisible, setVisible } = useExecutionLog();
+  const { theme } = useTheme();
 
   useEffect(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -533,7 +548,6 @@ export default function DashboardPage() {
     }
     const remaining = nodes.filter((n) => !assigned.has(n.id)).map((n) => n.id);
     if (remaining.length > 0) layers.push(remaining);
-    const nodeMap = new Map(nodes.map((n) => [n.id, n]));
     const padX = 220;
     const padY = 100;
     setNodes((prev) =>
@@ -557,102 +571,113 @@ export default function DashboardPage() {
   }, [nodes, edges, setNodes]);
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-zinc-800 bg-zinc-900/80 shrink-0">
-        <Link
-          href="/"
-          className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-        >
-          <Home className="h-4 w-4" />
-          Home
-        </Link>
-        <button
-          type="button"
-          onClick={handleRunWorkflow}
-          disabled={nodes.length === 0 || workflowRunning}
-          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {workflowRunning ? 'Running…' : 'Run workflow'}
-        </button>
-        <button
-          type="button"
-          onClick={handleRunSelected}
-          disabled={selectedNodeIds.length !== 1}
-          className="rounded-lg bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-600 disabled:opacity-40"
-        >
-          Run selected
-        </button>
-        <button
-          type="button"
-          onClick={clearRunCache}
-          className="rounded-lg bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-600"
-          title="Clear cached outputs (so connected inputs need re-run)"
-        >
-          Clear cache
-        </button>
-        <button
-          type="button"
-          onClick={handleClearCanvas}
-          className="rounded-lg bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-600"
-        >
-          Clear canvas
-        </button>
-        <button
-          type="button"
-          onClick={handlePrepopulate}
-          className="rounded-lg bg-amber-600/80 px-3 py-1.5 text-sm font-medium text-zinc-100 hover:bg-amber-500/80"
-          title="Load a test workflow (Constant → Summarize Text) and clear run cache"
-        >
-          Prepopulate
-        </button>
-        <button
-          type="button"
-          onClick={handleAutoLayout}
-          disabled={nodes.length === 0}
-          className="rounded-lg bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-600 disabled:opacity-40"
-        >
-          Auto-layout
-        </button>
-        <button
-          type="button"
-          onClick={() => setVisible(!isVisible)}
-          className={`rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-zinc-600 flex items-center gap-2 ${isVisible ? 'bg-zinc-600 text-white' : 'bg-zinc-700 text-zinc-200'
+    <div className="mx-auto flex w-full max-w-7xl flex-1 min-h-0 flex-col px-4 py-6 md:px-6 md:py-8">
+      <h1 className="text-2xl font-semibold tracking-tight text-app-fg">Lab</h1>
+      <p className="mt-1 text-sm text-app-soft">
+        Build block-based workflows, run them end-to-end, and inspect outputs as you iterate.
+      </p>
+
+      <div className="mt-5 rounded-2xl border border-app bg-app-surface/75 p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
+          >
+            <Home className="h-4 w-4" />
+            Home
+          </Link>
+          <button
+            type="button"
+            onClick={handleRunWorkflow}
+            disabled={nodes.length === 0 || workflowRunning}
+            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Play className="h-4 w-4" />
+            {workflowRunning ? 'Running…' : 'Run workflow'}
+          </button>
+          <button
+            type="button"
+            onClick={handleRunSelected}
+            disabled={selectedNodeIds.length !== 1}
+            className="inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg disabled:opacity-40"
+          >
+            <WandSparkles className="h-4 w-4" />
+            Run selected
+          </button>
+          <button
+            type="button"
+            onClick={handleAutoLayout}
+            disabled={nodes.length === 0}
+            className="inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg disabled:opacity-40"
+          >
+            <LayoutGrid className="h-4 w-4" />
+            Auto-layout
+          </button>
+          <button
+            type="button"
+            onClick={handlePrepopulate}
+            className="rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-300 transition hover:bg-amber-500/20"
+            title="Load Constant → Summarize test flow"
+          >
+            Prepopulate
+          </button>
+          <button
+            type="button"
+            onClick={() => setVisible(!isVisible)}
+            className={`inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm transition ${
+              isVisible
+                ? 'bg-blue-600/15 text-blue-300'
+                : 'text-app-soft hover:bg-app-surface hover:text-app-fg'
             }`}
-          title="Toggle execution log"
-        >
-          <ScrollText className="h-4 w-4" />
-          Logs
-        </button>
-        <button
-          type="button"
-          onClick={handleExport}
-          className="rounded-lg bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-600"
-        >
-          Export
-        </button>
-        <button type="button" onClick={handleImport} className="rounded-lg bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-600">
-          Import
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json,application/json"
-          className="hidden"
-          onChange={handleFileChange}
-        />
-        <span className="text-zinc-500 text-xs ml-2">
-          {nodes.length} block{nodes.length !== 1 ? 's' : ''}
-        </span>
-        {workflowError && (
-          <span className="text-red-400 text-xs ml-2" title={workflowError}>
-            {workflowError}
+          >
+            <ScrollText className="h-4 w-4" />
+            Logs
+          </button>
+          <button
+            type="button"
+            onClick={handleImport}
+            className="rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
+          >
+            Import
+          </button>
+          <button
+            type="button"
+            onClick={handleExport}
+            className="rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
+          >
+            Export
+          </button>
+          <button
+            type="button"
+            onClick={clearRunCache}
+            className="rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
+            title="Clear cached outputs"
+          >
+            Clear cache
+          </button>
+          <button
+            type="button"
+            onClick={handleClearCanvas}
+            className="inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-rose-300"
+          >
+            <Trash2 className="h-4 w-4" />
+            Clear canvas
+          </button>
+          <span className="ml-auto rounded-full border border-app px-2.5 py-1 text-xs text-app-soft">
+            {nodes.length} block{nodes.length !== 1 ? 's' : ''}
           </span>
+        </div>
+        {workflowError && (
+          <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+            {workflowError}
+          </p>
         )}
       </div>
-      <div className="flex-1 flex min-h-0">
+
+      <div className="mt-4 flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-app bg-app-surface/70">
         <BlockPalette onAddBlock={addBlockAt} />
-        <div className="flex-1 min-h-0 flex">
-          <div className="flex-1 min-h-0">
+        <div className="flex min-h-0 flex-1">
+          <div className="min-h-0 flex-1">
             <ReactFlowProvider>
               <FlowCanvas
                 nodes={nodes}
@@ -668,6 +693,7 @@ export default function DashboardPage() {
                 selectedNodeIds={selectedNodeIds}
                 setSelectedNodeIds={setSelectedNodeIds}
                 removeNodes={removeNodes}
+                theme={theme}
                 onNodeDoubleClick={(e, node) => {
                   if (node.data) {
                     setRunPanelNode({
@@ -694,6 +720,13 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json,application/json"
+        className="hidden"
+        onChange={handleFileChange}
+      />
       <ExecutionLogPanel />
       {entryModalFields && entryModalFields.length > 0 && (
         <EntryInputsModal
