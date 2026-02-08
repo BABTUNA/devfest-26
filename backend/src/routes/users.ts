@@ -10,7 +10,10 @@ export const usersRouter = Router();
  */
 usersRouter.get('/profile', requireAuth, async (req, res) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.authUserId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
     const profile = await getCurrentUserProfile(userId);
 
     if (!profile) {
@@ -34,7 +37,10 @@ usersRouter.get('/profile', requireAuth, async (req, res) => {
  */
 usersRouter.patch('/profile', requireAuth, async (req, res) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.authUserId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
     const { name } = req.body;
 
     if (!name) {

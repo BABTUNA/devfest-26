@@ -1,5 +1,15 @@
 import type { Request, Response, NextFunction } from 'express';
+import type { User } from '@supabase/supabase-js';
 import { supabase } from './supabase.js';
+
+declare global {
+  namespace Express {
+    interface Request {
+      authUser?: User;
+      authUserId?: string;
+    }
+  }
+}
 
 /**
  * Sign up a new user with email and password.
@@ -69,7 +79,8 @@ export async function getCurrentUser(req: Request) {
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
     const user = await getCurrentUser(req);
-    (req as any).user = user;
+    req.authUser = user;
+    req.authUserId = user.id;
     next();
   } catch (error) {
     res.status(401).json({
@@ -98,6 +109,10 @@ export function getAccessToken(req: Request): string | null {
  */
 export async function getCustomerExternalId(req: Request): Promise<string> {
   const DEMO_USER_ID = 'demo-user-1';
+
+  if (req.authUserId) {
+    return req.authUserId;
+  }
   
   try {
     const user = await getCurrentUser(req);

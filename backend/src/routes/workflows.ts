@@ -16,7 +16,10 @@ export const workflowsRouter = Router();
  */
 workflowsRouter.post('/', requireAuth, async (req, res) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.authUserId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
     const { name, description, definition } = req.body;
 
     if (!name) {
@@ -42,7 +45,10 @@ workflowsRouter.post('/', requireAuth, async (req, res) => {
  */
 workflowsRouter.get('/', requireAuth, async (req, res) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.authUserId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
     const workflows = await getUserWorkflows(userId);
 
     res.json(workflows);
@@ -60,7 +66,10 @@ workflowsRouter.get('/', requireAuth, async (req, res) => {
  */
 workflowsRouter.get('/:id', requireAuth, async (req, res) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.authUserId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
     const workflowId = String(req.params.id);
 
     const workflow = await getWorkflow(userId, workflowId);
@@ -86,7 +95,10 @@ workflowsRouter.get('/:id', requireAuth, async (req, res) => {
  */
 workflowsRouter.patch('/:id', requireAuth, async (req, res) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.authUserId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
     const workflowId = String(req.params.id);
     const updates = req.body;
 
@@ -107,7 +119,10 @@ workflowsRouter.patch('/:id', requireAuth, async (req, res) => {
  */
 workflowsRouter.delete('/:id', requireAuth, async (req, res) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.authUserId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
     const workflowId = String(req.params.id);
 
     await deleteWorkflow(userId, workflowId);

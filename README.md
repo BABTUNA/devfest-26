@@ -154,8 +154,8 @@ Block metadata (slugs, inputs, outputs) lives in `shared/src/blocks.ts`.
 
 ## Auth
 
-- **Current (hackathon):** Backend reads `X-User-Id` header or falls back to `demo-user-1`. Frontend sends a fixed demo user id.
-- **Production:** Replace with real auth (e.g. Supabase): verify JWT in the backend, use `user.id` (or `sub`) as `customerExternalId` in `backend/src/lib/auth.ts`, and pass the token (and user id) from the frontend on every request. See `Protosynthesis-main` for an auth + JWT pattern.
+- **Current:** Frontend uses Supabase login (`/login`, `/signup`) and sends `Authorization: Bearer <jwt>` to the backend.
+- **Backend:** JWTs are validated with Supabase and `user.id` is used as the authenticated customer identity. Demo mode still exists via `NEXT_PUBLIC_DEMO_MODE=true` and `DEMO_MODE=true`.
 
 ---
 

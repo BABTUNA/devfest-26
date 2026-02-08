@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { flowglad } from '../lib/flowglad.js';
-import { getCustomerExternalId } from '../lib/auth.js';
+import { getCustomerExternalId, requireAuth } from '../lib/auth.js';
 
 export const checkoutRouter = Router();
 
-checkoutRouter.post('/', async (req, res) => {
+checkoutRouter.post('/', requireAuth, async (req, res) => {
   try {
     const userId = await getCustomerExternalId(req);
     const { priceSlug, successUrl, cancelUrl } = req.body as {

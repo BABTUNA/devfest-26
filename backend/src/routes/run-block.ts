@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { flowglad } from '../lib/flowglad.js';
-import { getCustomerExternalId } from '../lib/auth.js';
+import { getCustomerExternalId, requireAuth } from '../lib/auth.js';
 import { getBlockById, type BlockId } from 'shared';
 import { runBlock } from '../services/run-block.js';
 
@@ -8,7 +8,7 @@ const DEMO_MODE = process.env.DEMO_MODE === 'true';
 
 export const runBlockRouter = Router();
 
-runBlockRouter.post('/', async (req, res) => {
+runBlockRouter.post('/', requireAuth, async (req, res) => {
   try {
     const { blockId, inputs } = req.body as { blockId: BlockId; inputs: Record<string, string | string[]> };
 

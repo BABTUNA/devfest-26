@@ -42,9 +42,11 @@ import type { BlockDefinition } from 'shared';
 import { getBlockById } from 'shared';
 import { topologicalOrder, getEntryInputs, getInputSource } from '@/lib/workflowLogic';
 import { EntryInputsModal, type EntryInputField } from '@/components/EntryInputsModal';
+import { RequireAuth } from '@/components/RequireAuth';
 import { useFlowRunStore } from '@/store/flowRunStore';
 import { useExecutionLog } from '@/store/executionLog';
 import { useTheme } from '@/contexts/ThemeContext';
+import { runBlock as runBlockApi } from '@/lib/api';
 
 type FlowNode = BlockFlowNode;
 type FlowEdge = Edge;
@@ -415,7 +417,6 @@ export default function DashboardPage() {
         return;
       }
       setWorkflowRunning(true);
-      const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
       try {
         for (const nodeId of order) {
           const node = nodes.find((n) => n.id === nodeId);
@@ -432,16 +433,7 @@ export default function DashboardPage() {
               inputs[input.key] = entryValues[nodeId]?.[input.key] ?? '';
             }
           }
-          const res = await fetch(`${API_URL}/api/run-block`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-User-Id': 'demo-user-1' },
-            body: JSON.stringify({ blockId: block.id, inputs }),
-          });
-          const json = await res.json();
-          if (!res.ok) {
-            setWorkflowError(json.error ?? `Failed at ${node.data?.label ?? nodeId}`);
-            return;
-          }
+          const json = await runBlockApi({ blockId: block.id, inputs });
           setNodeOutput(nodeId, json.outputs ?? {});
         }
       } catch (e) {
@@ -576,7 +568,8 @@ export default function DashboardPage() {
   }, [nodes, edges, setNodes]);
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-1 min-h-0 flex-col px-4 py-6 md:px-6 md:py-8">
+    <RequireAuth>
+      <div className="mx-auto flex w-full max-w-7xl flex-1 min-h-0 flex-col px-4 py-6 md:px-6 md:py-8">
       <h1 className="text-2xl font-semibold tracking-tight text-app-fg">Lab</h1>
       <p className="mt-1 text-sm text-app-soft">
         Build block-based workflows, run them end-to-end, and inspect outputs as you iterate.
@@ -740,6 +733,7 @@ export default function DashboardPage() {
           onCancel={() => setEntryModalFields(null)}
         />
       )}
-    </div>
+      </div>
+    </RequireAuth>
   );
 }

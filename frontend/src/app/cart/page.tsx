@@ -6,6 +6,7 @@ import { Loader2, Lock, CheckCircle2, ArrowRight } from 'lucide-react';
 import type { BlockDefinition } from 'shared';
 import { DEMO_MODE, createCheckoutSession, getProducts } from '@/lib/api';
 import { useAppBilling } from '@/contexts/AppBillingContext';
+import { RequireAuth } from '@/components/RequireAuth';
 
 export default function CheckoutPage() {
   const { hasFeatureAccess, refreshEntitlements, entitlementsLoading } = useAppBilling();
@@ -66,7 +67,8 @@ export default function CheckoutPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-6 md:px-6 md:py-8">
+    <RequireAuth>
+      <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-6 md:px-6 md:py-8">
       <h1 className="text-2xl font-semibold tracking-tight text-app-fg">Cart</h1>
       <p className="mt-1 text-sm text-app-soft">
         Unlock individual blocks with Flowglad hosted checkout, then return to Marketplace with updated entitlements.
@@ -142,6 +144,7 @@ export default function CheckoutPage() {
           View subscriptions and invoices
         </Link>
       </div>
-    </div>
+      </div>
+    </RequireAuth>
   );
 }

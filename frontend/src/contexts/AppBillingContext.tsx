@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { DEMO_MODE, createCheckoutSession as apiCreateCheckoutSession, getEntitlementsData } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 export type AppBillingValue = {
   loaded: boolean;
@@ -40,6 +41,7 @@ export function useAppBilling(): AppBillingValue {
 }
 
 export function AppBillingRoot({ children }: { children: ReactNode }) {
+  const { ready, isAuthenticated, user } = useAuth();
   const [entitlements, setEntitlements] = useState<Record<string, boolean>>({});
   const [entitlementsLoading, setEntitlementsLoading] = useState(true);
   const [entitlementsError, setEntitlementsError] = useState<string | undefined>(undefined);
@@ -55,6 +57,19 @@ export function AppBillingRoot({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (!ready) {
+      return;
+    }
+
+    if (!isAuthenticated) {
+      setEntitlements({});
+      setSubscriptions([]);
+      setBillingUnavailable(false);
+      setEntitlementsError(undefined);
+      setEntitlementsLoading(false);
+      return;
+    }
+
     setEntitlementsLoading(true);
     setEntitlementsError(undefined);
 
@@ -65,27 +80,43 @@ export function AppBillingRoot({ children }: { children: ReactNode }) {
       setBillingUnavailable(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch entitlements';
-      // Keep app usable in local/dev environments if billing is unavailable.
+      const status =
+        typeof error === 'object' && error && 'status' in error && typeof (error as { status?: unknown }).status === 'number'
+          ? (error as { status: number }).status
+          : undefined;
+
       setEntitlementsError(message);
+      setEntitlements({});
+
+      if (status === 401 || status === 403) {
+        setBillingUnavailable(false);
+        setSubscriptions([]);
+        return;
+      }
+
+      // Keep app usable in local/dev environments if billing is unavailable.
       setBillingUnavailable(true);
       setSubscriptions([{ id: 'fallback-subscription', status: 'active' }]);
       console.warn('Entitlements unavailable, falling back to unlocked mode:', message);
     } finally {
       setEntitlementsLoading(false);
     }
-  }, []);
+  }, [ready, isAuthenticated]);
 
   useEffect(() => {
+    if (!ready) return;
     void refreshEntitlements();
-  }, [refreshEntitlements]);
+  }, [ready, refreshEntitlements]);
 
   const hasFeatureAccess = useCallback(
     (featureSlug: string) => {
-      if (DEMO_MODE || billingUnavailable) return true;
+      if (DEMO_MODE) return true;
+      if (!isAuthenticated) return false;
+      if (billingUnavailable) return true;
       if (!featureSlug) return false;
       return Boolean(entitlements[featureSlug]);
     },
-    [entitlements, billingUnavailable]
+    [entitlements, billingUnavailable, isAuthenticated]
   );
 
   const createCheckoutSession = useCallback(
@@ -102,7 +133,14 @@ export function AppBillingRoot({ children }: { children: ReactNode }) {
   const value: AppBillingValue = useMemo(
     () => ({
       loaded: !entitlementsLoading,
-      customer: { name: 'Demo user', email: 'demo@example.com' },
+      customer: user
+        ? {
+            name:
+              (typeof user.user_metadata?.name === 'string' ? user.user_metadata.name : undefined) ??
+              user.email?.split('@')[0],
+            email: user.email,
+          }
+        : undefined,
       subscriptions,
       invoices: [],
       billingPortalUrl: undefined,
@@ -120,6 +158,7 @@ export function AppBillingRoot({ children }: { children: ReactNode }) {
     }),
     [
       subscriptions,
+      user,
       entitlements,
       entitlementsLoading,
       entitlementsError,

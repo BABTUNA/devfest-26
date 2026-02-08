@@ -7,6 +7,8 @@ import { BLOCK_DEFINITIONS } from 'shared';
 import { useAppBilling } from '@/contexts/AppBillingContext';
 import { DEMO_MODE } from '@/lib/api';
 import { useExecutionLog } from '@/store/executionLog';
+import { RequireAuth } from '@/components/RequireAuth';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function ProfilePage() {
   const {
@@ -19,6 +21,7 @@ export default function ProfilePage() {
     entitlementsLoading,
     refreshEntitlements,
   } = useAppBilling();
+  const { user } = useAuth();
 
   const entries = useExecutionLog((state) => state.entries);
 
@@ -36,21 +39,32 @@ export default function ProfilePage() {
   }, [entitlements]);
 
   if (!DEMO_MODE && !loaded) {
-    return <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 text-sm text-app-soft md:px-6">Loading billing profile…</div>;
+    return (
+      <RequireAuth>
+        <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 text-sm text-app-soft md:px-6">Loading billing profile…</div>
+      </RequireAuth>
+    );
   }
 
   const activeSubs = subscriptions?.filter((sub) => sub.status === 'active' || sub.status === 'trialing') ?? [];
+  const displayName =
+    customer?.name ??
+    (typeof user?.user_metadata?.name === 'string' ? user.user_metadata.name : undefined) ??
+    user?.email?.split('@')[0] ??
+    'User';
+  const displayEmail = customer?.email ?? user?.email ?? 'No email available';
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-6 md:px-6 md:py-8">
+    <RequireAuth>
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-6 md:px-6 md:py-8">
       <h1 className="text-2xl font-semibold tracking-tight text-app-fg">Profile</h1>
       <p className="mt-1 text-sm text-app-soft">Track account access, usage snapshots, subscriptions, and invoices.</p>
 
       <div className="mt-6 grid gap-4 md:grid-cols-3">
         <div className="rounded-xl border border-app bg-app-surface p-4">
           <p className="text-xs uppercase tracking-wide text-app-soft">User</p>
-          <p className="mt-2 text-sm font-medium text-app-fg">{customer?.name ?? 'Demo user'}</p>
-          <p className="text-sm text-app-soft">{customer?.email ?? 'demo@example.com'}</p>
+          <p className="mt-2 text-sm font-medium text-app-fg">{displayName}</p>
+          <p className="text-sm text-app-soft">{displayEmail}</p>
         </div>
 
         <div className="rounded-xl border border-app bg-app-surface p-4">
@@ -172,6 +186,7 @@ export default function ProfilePage() {
           Go to Cart
         </Link>
       </div>
-    </div>
+      </div>
+    </RequireAuth>
   );
 }

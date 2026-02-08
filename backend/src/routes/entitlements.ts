@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { flowglad } from '../lib/flowglad.js';
-import { getCustomerExternalId } from '../lib/auth.js';
+import { getCustomerExternalId, requireAuth } from '../lib/auth.js';
 import { BLOCK_DEFINITIONS } from 'shared';
 
 export const entitlementsRouter = Router();
 
-entitlementsRouter.get('/', async (req, res) => {
+entitlementsRouter.get('/', requireAuth, async (req, res) => {
   try {
     const userId = await getCustomerExternalId(req);
     const billing = await flowglad(userId).getBilling();

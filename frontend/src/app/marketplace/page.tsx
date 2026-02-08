@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Brain,
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useAppBilling } from '@/contexts/AppBillingContext';
 import { BlockCard } from '@/components/BlockCard';
+import { RequireAuth } from '@/components/RequireAuth';
 import { DEMO_MODE, createCheckoutSession, getProducts } from '@/lib/api';
 import type { BlockDefinition } from 'shared';
 
@@ -36,7 +38,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   GitBranch,
 };
 
-export default function LibraryPage() {
+function MarketplaceContent() {
   const searchParams = useSearchParams();
   const checkoutStatus = searchParams.get('checkout');
   const { hasFeatureAccess, entitlementsLoading, refreshEntitlements, entitlementsError } = useAppBilling();
@@ -166,7 +168,8 @@ export default function LibraryPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-6 md:px-6 md:py-8">
+    <RequireAuth>
+      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-6 md:px-6 md:py-8">
       <div className="mb-5 rounded-2xl border border-app bg-app-surface/75 p-4 md:p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -409,6 +412,15 @@ export default function LibraryPage() {
           )}
         </section>
       </div>
-    </div>
+      </div>
+    </RequireAuth>
+  );
+}
+
+export default function LibraryPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 text-sm text-app-soft md:px-6 md:py-8">Loading marketplace...</div>}>
+      <MarketplaceContent />
+    </Suspense>
   );
 }
