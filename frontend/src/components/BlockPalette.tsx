@@ -155,7 +155,7 @@ export function BlockPalette({
 
   return (
     <aside
-      className="w-64 shrink-0 overflow-hidden border-r border-app bg-app-surface/70"
+      className="flex h-full w-64 shrink-0 flex-col overflow-hidden border-r border-app bg-app-surface/70"
       onDragOver={(e) => e.preventDefault()}
     >
       <div className="border-b border-app p-3.5">

@@ -26,7 +26,7 @@ export function UserDropdown() {
   const { customer } = useAppBilling();
   const { theme, setTheme } = useTheme();
 
-  const displayName = customer?.name ?? 'Demo user';
+  const displayName = customer?.name ?? 'Demo User';
   const email = customer?.email ?? 'demo@example.com';
   const initial = displayName.charAt(0).toUpperCase();
 

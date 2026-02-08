@@ -39,7 +39,7 @@ export default function SettingsPage() {
   const [usageAlerts, setUsageAlerts] = useState(true);
   const [billingReminders, setBillingReminders] = useState(false);
 
-  const displayName = customer?.name ?? 'Demo user';
+  const displayName = customer?.name ?? 'Demo User';
   const email = customer?.email ?? 'demo@example.com';
 
   const themeOptions = [

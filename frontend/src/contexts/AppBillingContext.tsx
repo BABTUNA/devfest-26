@@ -92,7 +92,7 @@ export function AppBillingRoot({ children }: { children: ReactNode }) {
   const value: AppBillingValue = useMemo(
     () => ({
       loaded: !entitlementsLoading,
-      customer: { name: 'Demo user', email: 'demo@example.com' },
+      customer: { name: 'Demo User', email: 'demo@example.com' },
       subscriptions,
       invoices: [],
       billingPortalUrl: undefined,

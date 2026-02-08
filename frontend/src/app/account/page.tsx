@@ -50,7 +50,7 @@ export default function AccountPage() {
         <div className="rounded-xl border border-app bg-app-surface p-4">
           <p className="text-xs uppercase tracking-wide text-app-soft">User</p>
           <p className="mt-2 text-sm font-medium text-app-fg">
-            {customer?.name ?? 'Demo user'}
+            {customer?.name ?? 'Demo User'}
           </p>
           <p className="text-sm text-app-soft">{customer?.email ?? 'demo@example.com'}</p>
         </div>
