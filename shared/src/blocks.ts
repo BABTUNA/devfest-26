@@ -4,7 +4,6 @@ export type BlockId =
   | 'rewrite-prompt'
   | 'classify-input'
   | 'merge-pdfs'
-  | 'trigger'
   | 'text-join'
   | 'constant'
   | 'conditional'
@@ -13,7 +12,9 @@ export type BlockId =
   | 'speech-to-text'
   | 'send-slack'
   | 'send-discord'
-  | 'fetch-url';
+  | 'fetch-url'
+  | 'audio-player'
+  | 'browser-agent';
 
 export interface BlockDefinition {
   id: BlockId;
@@ -30,8 +31,6 @@ export interface BlockDefinition {
   usageMeterSlug?: string;
   /** Whether block uses Claude/GPT (true) or backend-only (false) */
   usesAI: boolean;
-  /** Number of tokens consumed per run (0 for free utility blocks) */
-  tokenCost: number;
   /** Optional checkout metadata resolved from Flowglad pricing model */
   priceName?: string | null;
   /** Price per unit in smallest currency unit (e.g. cents) */
@@ -53,7 +52,6 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     checkoutPriceSlugs: ['dummy5'],
     usageMeterSlug: 'summarize_text_runs',
     usesAI: true,
-    tokenCost: 1,
     inputs: [{ key: 'text', label: 'Text to summarize', type: 'text', required: true }],
     outputs: [{ key: 'summary', label: 'Summary' }],
   },
@@ -67,7 +65,6 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     checkoutPriceSlugs: ['dummy5'],
     usageMeterSlug: 'extract_emails_runs',
     usesAI: true,
-    tokenCost: 1,
     inputs: [{ key: 'text', label: 'Text to scan', type: 'text', required: true }],
     outputs: [{ key: 'emails', label: 'Extracted emails' }],
   },
@@ -81,7 +78,6 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     checkoutPriceSlugs: ['dummy5'],
     usageMeterSlug: 'rewrite_prompt_runs',
     usesAI: true,
-    tokenCost: 1,
     inputs: [{ key: 'text', label: 'Input to rewrite', type: 'text', required: true }],
     outputs: [{ key: 'rewritten', label: 'Rewritten text' }],
   },
@@ -95,7 +91,6 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     checkoutPriceSlugs: ['dummy5'],
     usageMeterSlug: 'classify_input_runs',
     usesAI: true,
-    tokenCost: 1,
     inputs: [{ key: 'text', label: 'Text to classify', type: 'text', required: true }],
     outputs: [{ key: 'label', label: 'Sentiment' }, { key: 'confidence', label: 'Confidence' }],
   },
@@ -108,25 +103,12 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     priceSlug: 'merge_pdfs',
     checkoutPriceSlugs: ['dummy5'],
     usesAI: false,
-    tokenCost: 1,
     inputs: [
       { key: 'files', label: 'PDF files', type: 'file', required: true },
     ],
     outputs: [{ key: 'mergedUrl', label: 'Download link' }],
   },
   // --- Workflow utility blocks (free, no billing) ---
-  {
-    id: 'trigger',
-    name: 'Trigger',
-    description: 'Start of a workflow. No inputs; outputs a signal so other blocks can depend on it.',
-    icon: 'Play',
-    featureSlug: 'free',
-    priceSlug: 'free',
-    usesAI: false,
-    tokenCost: 0,
-    inputs: [],
-    outputs: [{ key: 'trigger', label: 'Signal' }],
-  },
   {
     id: 'text-join',
     name: 'Text Join',
@@ -135,7 +117,6 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     featureSlug: 'free',
     priceSlug: 'free',
     usesAI: false,
-    tokenCost: 0,
     inputs: [
       { key: 'text1', label: 'First text', type: 'text', required: true },
       { key: 'text2', label: 'Second text', type: 'text', required: true },
@@ -151,7 +132,6 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     featureSlug: 'free',
     priceSlug: 'free',
     usesAI: false,
-    tokenCost: 0,
     inputs: [{ key: 'value', label: 'Value', type: 'text', required: true }],
     outputs: [{ key: 'value', label: 'Value' }],
   },
@@ -163,7 +143,6 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     featureSlug: 'free',
     priceSlug: 'free',
     usesAI: false,
-    tokenCost: 0,
     inputs: [
       { key: 'text', label: 'Text to check', type: 'text', required: true },
       { key: 'pattern', label: 'Contains (optional)', type: 'text', required: false },
@@ -181,7 +160,6 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     checkoutPriceSlugs: ['translate_text_usage'],
     usageMeterSlug: 'translate_text_runs',
     usesAI: true,
-    tokenCost: 1,
     inputs: [
       { key: 'text', label: 'Text to translate', type: 'text', required: true },
       { key: 'targetLanguage', label: 'Target language (e.g. Spanish, French)', type: 'text', required: true },
@@ -198,7 +176,6 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     checkoutPriceSlugs: ['text_to_speech_usage'],
     usageMeterSlug: 'text_to_speech_runs',
     usesAI: true,
-    tokenCost: 1,
     inputs: [
       { key: 'text', label: 'Text to speak', type: 'text', required: true },
       { key: 'voiceId', label: 'ElevenLabs Voice ID (optional)', type: 'text', required: false },
@@ -215,7 +192,6 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     checkoutPriceSlugs: ['speech_to_text_usage'],
     usageMeterSlug: 'speech_to_text_runs',
     usesAI: true,
-    tokenCost: 1,
     inputs: [
       { key: 'audioBase64', label: 'Audio file (base64)', type: 'text', required: true },
       { key: 'language', label: 'Language code (e.g. en, es)', type: 'text', required: false },
@@ -230,7 +206,6 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     featureSlug: 'free',
     priceSlug: 'free',
     usesAI: false,
-    tokenCost: 0,
     inputs: [
       { key: 'webhookUrl', label: 'Slack Webhook URL', type: 'text', required: true },
       { key: 'message', label: 'Message to send', type: 'text', required: true },
@@ -245,7 +220,6 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     featureSlug: 'free',
     priceSlug: 'free',
     usesAI: false,
-    tokenCost: 0,
     inputs: [
       { key: 'webhookUrl', label: 'Discord Webhook URL', type: 'text', required: true },
       { key: 'message', label: 'Message to send', type: 'text', required: true },
@@ -260,7 +234,6 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     featureSlug: 'free',
     priceSlug: 'free',
     usesAI: false,
-    tokenCost: 0,
     inputs: [
       { key: 'url', label: 'URL to fetch', type: 'text', required: true },
     ],
@@ -268,6 +241,39 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
       { key: 'body', label: 'Page content' },
       { key: 'statusCode', label: 'HTTP status code' },
     ],
+  },
+  {
+    id: 'audio-player',
+    name: 'Audio Player',
+    description: 'Play audio from base64-encoded MP3 data',
+    icon: 'Volume2',
+    featureSlug: 'free',
+    priceSlug: 'free',
+    usesAI: false,
+    inputs: [
+      { key: 'audioBase64', label: 'Audio data (base64)', type: 'text', required: true },
+      { key: 'volume', label: 'Volume (0-100)', type: 'text', required: false },
+      { key: 'autoPlay', label: 'Auto-play', type: 'text', required: false },
+      { key: 'showPlayer', label: 'Show audio player controls', type: 'text', required: false },
+    ],
+    outputs: [{ key: 'audioBase64', label: 'Audio data' }, { key: 'played', label: 'Playback status' }],
+  },
+  {
+    id: 'browser-agent',
+    name: 'Browser Agent',
+    description: 'Navigate to a URL and extract text content using a headless browser',
+    icon: 'Globe2',
+    featureSlug: 'browser_agent',
+    priceSlug: 'browser_agent',
+    checkoutPriceSlugs: ['browser_agent_usage'],
+    usageMeterSlug: 'browser_agent_runs',
+    usesAI: false,
+    inputs: [
+      { key: 'url', label: 'URL to visit', type: 'text', required: true },
+      { key: 'waitForSelector', label: 'Wait for selector (optional)', type: 'text', required: false },
+      { key: 'extractSelector', label: 'Extract selector (optional)', type: 'text', required: false },
+    ],
+    outputs: [{ key: 'text', label: 'Extracted text' }, { key: 'title', label: 'Page title' }],
   },
 ];
 
