@@ -36,13 +36,13 @@ export default function ProfilePage() {
   }, [entitlements]);
 
   if (!DEMO_MODE && !loaded) {
-    return <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 text-sm text-app-soft md:px-6">Loading billing profile…</div>;
+    return <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 text-sm text-app-soft md:px-6">Loading billing profile…</div>;
   }
 
   const activeSubs = subscriptions?.filter((sub) => sub.status === 'active' || sub.status === 'trialing') ?? [];
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-6 md:px-6 md:py-8">
+    <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-6 md:px-6 md:py-8">
       <h1 className="text-2xl font-semibold tracking-tight text-app-fg">Profile</h1>
       <p className="mt-1 text-sm text-app-soft">Track account access, usage snapshots, subscriptions, and invoices.</p>
 

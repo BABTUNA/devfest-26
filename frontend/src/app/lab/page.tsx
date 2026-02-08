@@ -572,13 +572,14 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-1 min-h-0 flex-col px-4 py-6 md:px-6 md:py-8">
-      <h1 className="text-2xl font-semibold tracking-tight text-app-fg">Lab</h1>
-      <p className="mt-1 text-sm text-app-soft">
-        Build block-based workflows, run them end-to-end, and inspect outputs as you iterate.
-      </p>
-
-      <div className="mt-5 rounded-2xl border border-app bg-app-surface/75 p-4">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="mb-5 rounded-2xl border border-app bg-app-surface/75 p-4 md:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-app-fg">Lab</h1>
+            <p className="mt-1 text-sm text-app-soft">
+              Build block-based workflows, run them end-to-end, and inspect outputs as you iterate.
+            </p>
+          </div>
           <Link
             href="/"
             className="inline-flex items-center gap-1.5 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
@@ -586,6 +587,9 @@ export default function DashboardPage() {
             <Home className="h-4 w-4" />
             Home
           </Link>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={handleRunWorkflow}
@@ -674,9 +678,9 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className="mt-4 flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-app bg-app-surface/70">
+      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[260px_1fr]">
         <BlockPalette onAddBlock={addBlockAt} />
-        <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 overflow-hidden rounded-2xl border border-app bg-app-surface/70">
           <div className="min-h-0 flex-1">
             <ReactFlowProvider>
               <FlowCanvas

@@ -42,7 +42,7 @@ export function BlockPalette({
 
   return (
     <aside
-      className="w-64 shrink-0 overflow-hidden border-r border-app bg-app-surface/70"
+      className="h-full w-full overflow-hidden rounded-2xl border border-app bg-app-surface/70"
       onDragOver={(e) => e.preventDefault()}
     >
       <div className="border-b border-app p-3.5">
