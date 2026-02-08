@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { X, Play, Loader2, Lock, Link2, Coins } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { X, Play, Loader2, Lock, Link2, Coins, Volume2, Mic, Square } from 'lucide-react';
 import { getBlockById, type BlockId } from 'shared';
 import { useAppBilling } from '@/contexts/AppBillingContext';
 import { useTokens } from '@/contexts/TokenContext';
@@ -11,7 +11,7 @@ import { getInputSource } from '@/lib/workflowLogic';
 import { createCheckoutSession, runBlock } from '@/lib/api';
 import type { Node, Edge } from '@xyflow/react';
 
-type NodeData = { blockId: string; label: string; icon?: string };
+type NodeData = { blockId: string; label: string; icon?: string; config?: Record<string, unknown> };
 
 export function RunBlockPanel({
   nodeId,
@@ -34,12 +34,56 @@ export function RunBlockPanel({
   const setNodeOutput = useFlowRunStore((s) => s.setNodeOutput);
   const getOutputs = useFlowRunStore((s) => s.outputsByNode[nodeId]);
 
-  const [inputs, setInputs] = useState<Record<string, string>>({});
+  const [inputs, setInputs] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    if (data.config) {
+      for (const [k, v] of Object.entries(data.config)) {
+        if (v != null) init[k] = String(v);
+      }
+    }
+    return init;
+  });
   const [output, setOutput] = useState<Record<string, unknown> | null>(() => getOutputs ?? null);
   const [error, setError] = useState<string | null>(null);
   const [needsTokens, setNeedsTokens] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const logAdd = useExecutionLog((s) => s.add);
+
+  const isSpeechToText = block?.id === 'speech-to-text';
+
+  // Auto-play audio when audioBase64 output is received
+  useEffect(() => {
+    if (output && typeof output.audioBase64 === 'string' && output.audioBase64) {
+      const audioDataUrl = `data:audio/mpeg;base64,${output.audioBase64}`;
+      const audio = new Audio(audioDataUrl);
+      audioRef.current = audio;
+      
+      audio.onplay = () => setAudioPlaying(true);
+      audio.onended = () => setAudioPlaying(false);
+      audio.onpause = () => setAudioPlaying(false);
+      audio.onerror = () => {
+        setAudioPlaying(false);
+        console.error('Audio playback failed');
+      };
+
+      // Auto-play the audio
+      audio.play().catch((e) => {
+        console.error('Failed to auto-play audio:', e);
+        setAudioPlaying(false);
+      });
+
+      return () => {
+        audio.pause();
+        audio.src = '';
+        setAudioPlaying(false);
+      };
+    }
+  }, [output]);
 
   const textInputs = block?.inputs?.filter((i) => i.type === 'text') ?? [];
   const inputSources = useMemo(() => {
@@ -56,11 +100,12 @@ export function RunBlockPanel({
         const v = getOutput(source.sourceNodeId, source.sourceHandle);
         out[key] = v != null ? String(v) : '';
       } else {
-        out[key] = inputs[key] ?? '';
+        const configVal = data.config?.[key];
+        out[key] = inputs[key] ?? (configVal != null ? String(configVal) : '');
       }
     });
     return out;
-  }, [inputSources, getOutput, inputs]);
+  }, [inputSources, getOutput, inputs, data.config]);
 
   const hasMissingConnected = inputSources.some(({ source }) => {
     if (source.type !== 'connected') return false;
@@ -102,13 +147,14 @@ export function RunBlockPanel({
       setNodeOutput(nodeId, outputs);
       logAdd({ blockName: data.label, blockId: block.id, success: true, output: outputs });
     } catch (e) {
-      const err = e as Error & { status?: number; data?: { needsPurchase?: boolean; tokenCost?: number; currentBalance?: number } };
+      const err = e as Error & { status?: number; data?: { needsPurchase?: boolean; tokenCost?: number; currentBalance?: number; message?: string; error?: string } };
+      console.error('[RunBlockPanel] Error:', err, err.data);
       if (err.status === 402 && err.data?.needsPurchase) {
         setError(`Insufficient tokens. Need ${err.data.tokenCost ?? block.tokenCost}, you have ${err.data.currentBalance ?? balance}.`);
         setNeedsTokens(true);
         logAdd({ blockName: data.label, blockId: block.id, success: false, error: 'Insufficient tokens' });
       } else {
-        const errMsg = err.message || 'Request failed';
+        const errMsg = err.data?.message || err.data?.error || err.message || 'Request failed';
         setError(errMsg);
         logAdd({ blockName: data.label, blockId: block.id, success: false, error: errMsg });
       }
@@ -179,6 +225,54 @@ export function RunBlockPanel({
                       <p className="mt-1 text-amber-700 dark:text-amber-300">Run upstream block first</p>
                     )}
                   </div>
+                ) : isSpeechToText && key === 'audioBase64' ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (recording) {
+                            mediaRecorderRef.current?.stop();
+                            setRecording(false);
+                            return;
+                          }
+                          setRecordingError(null);
+                          try {
+                            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                            const recorder = new MediaRecorder(stream);
+                            const chunks: Blob[] = [];
+                            recorder.ondataavailable = (e) => e.data.size > 0 && chunks.push(e.data);
+                            recorder.onstop = async () => {
+                              stream.getTracks().forEach((t) => t.stop());
+                              const blob = new Blob(chunks, { type: 'audio/webm' });
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                const base64 = (reader.result as string).split(',')[1];
+                                if (base64) setInputs((prev) => ({ ...prev, audioBase64: base64 }));
+                              };
+                              reader.readAsDataURL(blob);
+                            };
+                            mediaRecorderRef.current = recorder;
+                            recorder.start();
+                            setRecording(true);
+                          } catch (e) {
+                            setRecordingError(e instanceof Error ? e.message : 'Microphone access denied');
+                          }
+                        }}
+                        className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${
+                          recording ? 'bg-rose-600 text-white hover:bg-rose-500' : 'bg-blue-600 text-white hover:bg-blue-500'
+                        }`}
+                      >
+                        {recording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                        {recording ? 'Stop recording' : 'Record from mic'}
+                      </button>
+                      <span className="text-xs text-app-soft">
+                        {inputs[key] ? 'Audio captured ✓' : 'Record to provide audio'}
+                      </span>
+                    </div>
+                    {recordingError && <p className="text-xs text-rose-600 dark:text-rose-400">{recordingError}</p>}
+                    <p className="text-[10px] text-app-soft">Or connect from an upstream block (e.g. Text to Speech) that outputs audio.</p>
+                  </div>
                 ) : (
                   <textarea
                     placeholder={block.inputs?.find((i) => i.key === key)?.required ? 'Required' : 'Optional'}
@@ -216,9 +310,51 @@ export function RunBlockPanel({
         {output != null && (
           <div>
             <p className="mb-1 text-xs font-medium text-app-soft">Output (cached for downstream)</p>
-            <pre className="max-h-48 overflow-auto rounded-lg border border-app bg-app-card p-3 text-xs text-app-fg">
-              {JSON.stringify(output, null, 2)}
-            </pre>
+            {output.audioBase64 && typeof output.audioBase64 === 'string' ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 rounded-lg border border-app bg-app-card p-3">
+                  <Volume2 className={`h-4 w-4 ${audioPlaying ? 'text-blue-600' : 'text-app-soft'}`} />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-app-fg">Audio generated</p>
+                    <p className="text-[10px] text-app-soft">
+                      {audioPlaying ? 'Playing...' : 'Click to replay'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (audioRef.current) {
+                        if (audioPlaying) {
+                          audioRef.current.pause();
+                          audioRef.current.currentTime = 0;
+                        } else {
+                          audioRef.current.play();
+                        }
+                      } else if (output.audioBase64) {
+                        const audio = new Audio(`data:audio/mpeg;base64,${output.audioBase64}`);
+                        audioRef.current = audio;
+                        audio.onplay = () => setAudioPlaying(true);
+                        audio.onended = () => setAudioPlaying(false);
+                        audio.onpause = () => setAudioPlaying(false);
+                        audio.play();
+                      }
+                    }}
+                    className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500"
+                  >
+                    {audioPlaying ? 'Stop' : 'Play'}
+                  </button>
+                </div>
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-app-soft">Show raw output</summary>
+                  <pre className="mt-2 max-h-32 overflow-auto rounded-lg border border-app bg-app-card p-2 text-[10px] text-app-fg">
+                    {JSON.stringify({ ...output, audioBase64: `${output.audioBase64.slice(0, 50)}... (truncated)` }, null, 2)}
+                  </pre>
+                </details>
+              </div>
+            ) : (
+              <pre className="max-h-48 overflow-auto rounded-lg border border-app bg-app-card p-3 text-xs text-app-fg">
+                {JSON.stringify(output, null, 2)}
+              </pre>
+            )}
           </div>
         )}
       </div>

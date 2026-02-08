@@ -31,10 +31,15 @@ async function apiRequest<T>(path: string, options: ApiOptions = {}): Promise<T>
   }
 
   if (!response.ok) {
-    const message =
-      typeof json === 'object' && json && 'error' in json && typeof (json as { error?: unknown }).error === 'string'
-        ? (json as { error: string }).error
-        : `Request failed: ${response.status}`;
+    let message = `Request failed: ${response.status}`;
+    if (typeof json === 'object' && json) {
+      // Prefer 'message' field for detailed errors, fallback to 'error'
+      if ('message' in json && typeof json.message === 'string') {
+        message = json.message;
+      } else if ('error' in json && typeof json.error === 'string') {
+        message = json.error;
+      }
+    }
     const error = new Error(message) as Error & { status?: number; data?: unknown };
     error.status = response.status;
     error.data = json;
@@ -110,4 +115,11 @@ export async function runBlock(params: {
     method: 'POST',
     body: params,
   });
+}
+
+export type ElevenLabsVoice = { voice_id: string; name: string };
+
+export async function getElevenLabsVoices(): Promise<ElevenLabsVoice[]> {
+  const data = await apiRequest<{ voices: ElevenLabsVoice[] }>('/api/elevenlabs/voices');
+  return data.voices ?? [];
 }

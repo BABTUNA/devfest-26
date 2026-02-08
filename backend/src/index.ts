@@ -10,6 +10,7 @@ import { entitlementsRouter } from './routes/entitlements.js';
 import { checkoutRouter } from './routes/checkout.js';
 import { webhookRouter } from './routes/webhook.js';
 import { tokensRouter } from './routes/tokens.js';
+import { elevenlabsVoicesRouter } from './routes/elevenlabs-voices.js';
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -28,7 +29,8 @@ if (!DEMO_MODE && !FLOWGLAD_SECRET_KEY) {
 console.log('============================');
 
 app.use(cors({ origin: process.env.FRONTEND_URL ?? 'http://localhost:3000', credentials: true }));
-app.use(express.json());
+// Increase body size limit to 10MB to handle large webpage content
+app.use(express.json({ limit: '10mb' }));
 
 // Global request logger
 app.use((req, res, next) => {
@@ -71,6 +73,7 @@ app.use('/api/entitlements', entitlementsRouter);
 app.use('/api/checkout', checkoutRouter);
 app.use('/api/webhook', webhookRouter);
 app.use('/api/tokens', tokensRouter);
+app.use('/api/elevenlabs/voices', elevenlabsVoicesRouter);
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 

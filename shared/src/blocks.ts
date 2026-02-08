@@ -225,30 +225,30 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
   {
     id: 'send-slack',
     name: 'Send to Slack',
-    description: 'Enter a message + Slack webhook URL → message gets posted to your Slack channel.',
+    description: 'Connect text from upstream block + configure Slack webhook URL in block settings.',
     icon: 'MessageSquare',
     featureSlug: 'free',
     priceSlug: 'free',
     usesAI: false,
     tokenCost: 0,
     inputs: [
-      { key: 'webhookUrl', label: 'Slack Webhook URL', type: 'text', required: true },
       { key: 'message', label: 'Message to send', type: 'text', required: true },
+      { key: 'webhookUrl', label: 'Slack Webhook URL', type: 'text', required: true },
     ],
     outputs: [{ key: 'status', label: 'Send status' }],
   },
   {
     id: 'send-discord',
     name: 'Send to Discord',
-    description: 'Enter a message + Discord webhook URL → message gets posted to your Discord channel.',
+    description: 'Connect text from upstream block + configure Discord webhook URL in block settings.',
     icon: 'Hash',
     featureSlug: 'free',
     priceSlug: 'free',
     usesAI: false,
     tokenCost: 0,
     inputs: [
-      { key: 'webhookUrl', label: 'Discord Webhook URL', type: 'text', required: true },
       { key: 'message', label: 'Message to send', type: 'text', required: true },
+      { key: 'webhookUrl', label: 'Discord Webhook URL', type: 'text', required: true },
     ],
     outputs: [{ key: 'status', label: 'Send status' }],
   },
@@ -267,6 +267,7 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     outputs: [
       { key: 'body', label: 'Page content' },
       { key: 'statusCode', label: 'HTTP status code' },
+      { key: 'url', label: 'Resolved URL' },
     ],
   },
 ];

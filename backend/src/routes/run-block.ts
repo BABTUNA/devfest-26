@@ -109,10 +109,9 @@ runBlockRouter.post('/', async (req, res) => {
       let hasAccess = false;
 
       if (DEMO_MODE) {
-        // In demo mode, check our in-memory demo entitlements
-        const userEntitlements = getDemoEntitlements(userId);
-        hasAccess = userEntitlements.has(block.featureSlug);
-        console.log(`[RunBlock/Demo] User ${userId} access to ${block.featureSlug}: ${hasAccess}`);
+        // In demo mode, allow all blocks to run
+        hasAccess = true;
+        console.log(`[RunBlock/Demo] User ${userId} access to ${block.featureSlug}: granted (demo mode)`);
       } else {
         // Real Flowglad billing check - try SDK first
         try {
@@ -183,7 +182,14 @@ runBlockRouter.post('/', async (req, res) => {
       tokensRemaining: newBalance,
     });
   } catch (e) {
-    console.error('run-block error', e);
-    return res.status(500).json({ error: 'Failed to run block' });
+    console.error('[RunBlock] Error:', e);
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    const errorStack = e instanceof Error ? e.stack : undefined;
+    console.error('[RunBlock] Error details:', { errorMessage, errorStack });
+    return res.status(500).json({ 
+      error: 'Failed to run block',
+      message: errorMessage,
+      ...(process.env.NODE_ENV === 'development' && errorStack ? { stack: errorStack } : {}),
+    });
   }
 });

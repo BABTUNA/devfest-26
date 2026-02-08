@@ -29,9 +29,11 @@ import {
   LayoutGrid,
   Trash2,
   PackagePlus,
+  Bot,
 } from 'lucide-react';
 import { BlockNode, type BlockFlowNode, type BlockNodeData } from '@/components/BlockNode';
 import { BlockPalette } from '@/components/BlockPalette';
+import { BlockConfigModal } from '@/components/BlockConfigModal';
 import { RunBlockPanel } from '@/components/RunBlockPanel';
 import { ExecutionLogPanel } from '@/components/ExecutionLogPanel';
 import {
@@ -41,12 +43,13 @@ import {
 } from '@/components/FlowContextMenu';
 import type { BlockDefinition } from 'shared';
 import { getBlockById } from 'shared';
-import { topologicalOrder, getEntryInputs, getInputSource } from '@/lib/workflowLogic';
-import { EntryInputsModal, type EntryInputField } from '@/components/EntryInputsModal';
+import { topologicalOrder, getInputSource, getConnectedNodeIds } from '@/lib/workflowLogic';
 import { useFlowRunStore } from '@/store/flowRunStore';
 import { useExecutionLog } from '@/store/executionLog';
 import { useTheme } from '@/contexts/ThemeContext';
 import { CreateProductModal } from '@/components/CreateProductModal';
+import { SaveAsAgentModal } from '@/components/SaveAsAgentModal';
+import { useAgentStore, type SavedAgent } from '@/store/agentStore';
 
 type FlowNode = BlockFlowNode;
 type FlowEdge = Edge;
@@ -129,6 +132,7 @@ const DRAG_TYPE = 'application/reactflow';
 
 type ContextMenuState = { node: FlowNode; x: number; y: number } | null;
 type RunPanelState = { id: string; data: BlockNodeData } | null;
+type ConfigModalState = FlowNode | null;
 
 function FlowCanvas({
   nodes,
@@ -146,6 +150,7 @@ function FlowCanvas({
   removeNodes,
   onNodeDoubleClick,
   theme,
+  onDropAgent,
 }: {
   nodes: FlowNode[];
   setNodes: (u: FlowNode[] | ((prev: FlowNode[]) => FlowNode[])) => void;
@@ -162,6 +167,7 @@ function FlowCanvas({
   removeNodes: (ids: string[]) => void;
   onNodeDoubleClick: (event: React.MouseEvent, node: FlowNode) => void;
   theme: 'dark' | 'light';
+  onDropAgent?: (agentId: string, position: { x: number; y: number }) => void;
 }) {
   const { screenToFlowPosition } = useReactFlow();
   const isDark = theme === 'dark';
@@ -184,17 +190,24 @@ function FlowCanvas({
       event.preventDefault();
       const raw = event.dataTransfer.getData(DRAG_TYPE);
       if (!raw) return;
-      let payload: { type: string; blockId?: string; label?: string; icon?: string };
+      let payload: { type: string; blockId?: string; label?: string; icon?: string; agentId?: string };
       try {
         payload = JSON.parse(raw);
       } catch {
         return;
       }
-      if (payload.type !== 'block' || !payload.blockId || !payload.label) return;
       const position = screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
       });
+
+      // Handle agent drops
+      if (payload.type === 'agent' && payload.agentId) {
+        onDropAgent?.(payload.agentId, { x: position.x, y: position.y });
+        return;
+      }
+
+      if (payload.type !== 'block' || !payload.blockId || !payload.label) return;
       const newNode: FlowNode = {
         id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         type: 'block',
@@ -207,7 +220,7 @@ function FlowCanvas({
       };
       setNodes((prev) => [...prev, newNode]);
     },
-    [screenToFlowPosition, setNodes]
+    [screenToFlowPosition, setNodes, onDropAgent]
   );
 
   const handleNodeContextMenu = useCallback(
@@ -256,6 +269,7 @@ function FlowCanvas({
               blockId: String(contextMenu.node.data.blockId),
               label: String(contextMenu.node.data.label),
               icon: contextMenu.node.data.icon,
+              config: contextMenu.node.data.config,
             },
           });
         }
@@ -301,7 +315,7 @@ function FlowCanvas({
         />
         <Panel position="top-center" className="rounded-full border border-app bg-app-surface px-3 py-1.5 shadow-sm backdrop-blur">
           <span className="text-app-soft text-xs">
-            Drag to add blocks, connect outputs to inputs, double-click nodes to run
+            Drag to add blocks, connect outputs to inputs, double-click to configure, right-click to run
           </span>
         </Panel>
         {nodes.length === 0 && (
@@ -337,8 +351,8 @@ export default function DashboardPage() {
   }, [setNodes, setEdges]);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const [runPanelNode, setRunPanelNode] = useState<RunPanelState>(null);
+  const [configModalNode, setConfigModalNode] = useState<ConfigModalState>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
-  const [entryModalFields, setEntryModalFields] = useState<EntryInputField[] | null>(null);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
   const [workflowRunning, setWorkflowRunning] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -348,6 +362,13 @@ export default function DashboardPage() {
   const { isVisible, setVisible } = useExecutionLog();
   const { resolvedTheme } = useTheme();
   const [showCreateProductModal, setShowCreateProductModal] = useState(false);
+  const [showSaveAgentModal, setShowSaveAgentModal] = useState(false);
+  const agentHydrate = useAgentStore((s) => s.hydrate);
+  const addAgent = useAgentStore((s) => s.addAgent);
+  const savedAgents = useAgentStore((s) => s.agents);
+
+  // Hydrate agent store on mount
+  useEffect(() => { agentHydrate(); }, [agentHydrate]);
 
   useEffect(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -404,6 +425,7 @@ export default function DashboardPage() {
           blockId: String(node.data.blockId),
           label: String(node.data.label),
           icon: node.data.icon,
+          config: node.data.config,
         },
       });
     }
@@ -412,10 +434,17 @@ export default function DashboardPage() {
   const runWorkflowWithEntryValues = useCallback(
     async (entryValues: Record<string, Record<string, string>>) => {
       setWorkflowError(null);
-      setEntryModalFields(null);
-      const order = topologicalOrder(nodes, edges);
+      const connectedIds = getConnectedNodeIds(nodes, edges);
+      const connectedNodes = nodes.filter((n) => connectedIds.has(n.id));
+      const order = topologicalOrder(connectedNodes, edges);
       if (!order || order.length === 0) {
-        setWorkflowError(order === null ? 'Workflow has a cycle.' : 'No nodes to run.');
+        setWorkflowError(
+          order === null
+            ? 'Workflow has a cycle.'
+            : connectedIds.size === 0
+              ? 'Connect blocks with edges to run. Only connected nodes are executed.'
+              : 'No nodes to run.'
+        );
         return;
       }
       setWorkflowRunning(true);
@@ -433,7 +462,10 @@ export default function DashboardPage() {
               const v = getOutput(src.sourceNodeId, src.sourceHandle);
               inputs[input.key] = v != null ? String(v) : '';
             } else {
-              inputs[input.key] = entryValues[nodeId]?.[input.key] ?? '';
+              const configVal = (node.data as BlockNodeData).config?.[input.key];
+              inputs[input.key] =
+                entryValues[nodeId]?.[input.key] ??
+                (configVal != null ? String(configVal) : '');
             }
           }
           const res = await fetch(`${API_URL}/api/run-block`, {
@@ -441,12 +473,34 @@ export default function DashboardPage() {
             headers: { 'Content-Type': 'application/json', 'X-User-Id': 'demo-user-1' },
             body: JSON.stringify({ blockId: block.id, inputs }),
           });
-          const json = await res.json();
+          let json: { message?: string; error?: string; outputs?: Record<string, unknown> };
+          try {
+            json = await res.json();
+          } catch {
+            json = { error: `Server error ${res.status}` };
+          }
           if (!res.ok) {
-            setWorkflowError(json.error ?? `Failed at ${node.data?.label ?? nodeId}`);
+            const errorMsg = json.message || json.error || `Failed at ${node.data?.label ?? nodeId}`;
+            console.error(`[Workflow] Error at ${node.data?.label ?? nodeId}:`, errorMsg, json);
+            setWorkflowError(errorMsg);
             return;
           }
-          setNodeOutput(nodeId, json.outputs ?? {});
+          const outputs = json.outputs ?? {};
+          setNodeOutput(nodeId, outputs);
+
+          // Auto-play audio if this block produced audioBase64
+          if (typeof outputs.audioBase64 === 'string' && outputs.audioBase64) {
+            try {
+              const audio = new Audio(`data:audio/mpeg;base64,${outputs.audioBase64}`);
+              await new Promise<void>((resolve, reject) => {
+                audio.onended = () => resolve();
+                audio.onerror = () => reject(new Error('Audio playback failed'));
+                audio.play().catch(reject);
+              });
+            } catch (audioErr) {
+              console.warn('[Workflow] Audio playback failed:', audioErr);
+            }
+          }
         }
       } catch (e) {
         setWorkflowError(e instanceof Error ? e.message : 'Workflow run failed');
@@ -459,22 +513,79 @@ export default function DashboardPage() {
 
   const handleRunWorkflow = useCallback(() => {
     setWorkflowError(null);
-    const order = topologicalOrder(nodes, edges);
+    const connectedIds = getConnectedNodeIds(nodes, edges);
+    const connectedNodes = nodes.filter((n) => connectedIds.has(n.id));
+    const order = topologicalOrder(connectedNodes, edges);
     if (!order || order.length === 0) {
-      setWorkflowError(order === null ? 'Workflow has a cycle.' : 'Add blocks to run.');
+      setWorkflowError(
+        order === null
+          ? 'Workflow has a cycle.'
+          : connectedIds.size === 0
+            ? 'Connect blocks with edges to run. Only connected nodes are executed.'
+            : 'Add blocks to run.'
+      );
       return;
     }
-    const entryFields = getEntryInputs(nodes, edges, (nodeId) => {
-      const node = nodes.find((n) => n.id === nodeId);
-      const block = getBlockById(node?.data?.blockId as import('shared').BlockId);
-      return (block?.inputs ?? []).map((i) => ({ key: i.key, label: i.label }));
-    });
-    if (entryFields.length > 0) {
-      setEntryModalFields(entryFields);
-    } else {
-      runWorkflowWithEntryValues({});
-    }
+    // Run workflow directly - use config values and connected inputs, empty strings for missing values
+    runWorkflowWithEntryValues({});
   }, [nodes, edges, runWorkflowWithEntryValues]);
+
+  /** Save current workflow as an agent */
+  const handleSaveAgent = useCallback(
+    (name: string) => {
+      if (nodes.length === 0) return;
+      // Normalise positions so they're relative to the top-left of the bounding box
+      const minX = Math.min(...nodes.map((n) => n.position.x));
+      const minY = Math.min(...nodes.map((n) => n.position.y));
+      const normalisedNodes = nodes.map((n) => ({
+        ...n,
+        position: { x: n.position.x - minX, y: n.position.y - minY },
+      }));
+      const agent: SavedAgent = {
+        id: `agent-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        name,
+        nodes: normalisedNodes,
+        edges: [...edges],
+        createdAt: new Date().toISOString(),
+      };
+      addAgent(agent);
+      setShowSaveAgentModal(false);
+    },
+    [nodes, edges, addAgent]
+  );
+
+  /** Expand a saved agent onto the canvas at the drop/click position */
+  const expandAgentOnCanvas = useCallback(
+    (agent: SavedAgent, position?: { x: number; y: number }) => {
+      const origin = position ?? {
+        x: 120 + (nodes.length % 4) * 240,
+        y: 100 + Math.floor(nodes.length / 4) * 120,
+      };
+      const ts = Date.now();
+      const idMap = new Map<string, string>();
+      // Create new node IDs
+      agent.nodes.forEach((n, i) => {
+        idMap.set(n.id, `agent-${ts}-${i}-${Math.random().toString(36).slice(2, 7)}`);
+      });
+      const newNodes: FlowNode[] = agent.nodes.map((n) => ({
+        ...n,
+        id: idMap.get(n.id)!,
+        position: {
+          x: origin.x + n.position.x,
+          y: origin.y + n.position.y,
+        },
+      }));
+      const newEdges: FlowEdge[] = agent.edges.map((e) => ({
+        ...e,
+        id: `edge-${ts}-${Math.random().toString(36).slice(2, 7)}`,
+        source: idMap.get(e.source) ?? e.source,
+        target: idMap.get(e.target) ?? e.target,
+      }));
+      setNodes((prev) => [...prev, ...newNodes]);
+      setEdges((prev) => [...prev, ...newEdges]);
+    },
+    [nodes.length, setNodes, setEdges]
+  );
 
   const addBlockAt = useCallback(
     (block: BlockDefinition, position?: { x: number; y: number }) => {
@@ -677,6 +788,20 @@ export default function DashboardPage() {
           </button>
           <button
             type="button"
+            onClick={() => {
+              if (nodes.length === 0) {
+                window.alert('Add blocks to the canvas first.');
+                return;
+              }
+              setShowSaveAgentModal(true);
+            }}
+            className="inline-flex items-center gap-2 rounded-lg border border-rose-400/40 px-3 py-2 text-sm text-rose-400 transition hover:bg-rose-500/10 hover:text-rose-300"
+          >
+            <Bot className="h-4 w-4" />
+            Save as Agent
+          </button>
+          <button
+            type="button"
             onClick={handleClearCanvas}
             className="inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-rose-300"
           >
@@ -695,7 +820,11 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[260px_1fr]">
-        <BlockPalette onAddBlock={addBlockAt} />
+        <BlockPalette
+          onAddBlock={addBlockAt}
+          savedAgents={savedAgents}
+          onAddAgent={expandAgentOnCanvas}
+        />
         <div className="flex min-h-0 overflow-hidden rounded-2xl border border-app bg-app-surface/70">
           <div className="min-h-0 flex-1">
             <ReactFlowProvider>
@@ -715,16 +844,11 @@ export default function DashboardPage() {
                 removeNodes={removeNodes}
                 theme={resolvedTheme}
                 onNodeDoubleClick={(e, node) => {
-                  if (node.data) {
-                    setRunPanelNode({
-                      id: node.id,
-                      data: {
-                        blockId: String(node.data.blockId),
-                        label: String(node.data.label),
-                        icon: node.data.icon,
-                      },
-                    });
-                  }
+                  if (node.data) setConfigModalNode(node);
+                }}
+                onDropAgent={(agentId, position) => {
+                  const agent = savedAgents.find((a) => a.id === agentId);
+                  if (agent) expandAgentOnCanvas(agent, position);
                 }}
               />
             </ReactFlowProvider>
@@ -748,11 +872,22 @@ export default function DashboardPage() {
         onChange={handleFileChange}
       />
       <ExecutionLogPanel />
-      {entryModalFields && entryModalFields.length > 0 && (
-        <EntryInputsModal
-          fields={entryModalFields}
-          onSubmit={(values) => runWorkflowWithEntryValues(values)}
-          onCancel={() => setEntryModalFields(null)}
+      {configModalNode && (
+        <BlockConfigModal
+          nodeId={configModalNode.id}
+          data={configModalNode.data as BlockNodeData}
+          config={(configModalNode.data?.config as Record<string, unknown>) ?? {}}
+          onSave={(config) => {
+            setNodes((prev) =>
+              prev.map((n) =>
+                n.id === configModalNode.id
+                  ? { ...n, data: { ...n.data, config } }
+                  : n
+              )
+            );
+            setConfigModalNode(null);
+          }}
+          onClose={() => setConfigModalNode(null)}
         />
       )}
       {showCreateProductModal && (
@@ -762,6 +897,12 @@ export default function DashboardPage() {
             setShowCreateProductModal(false);
             window.alert(`Agent "${product.name}" created successfully! Check the Marketplace.`);
           }}
+        />
+      )}
+      {showSaveAgentModal && (
+        <SaveAsAgentModal
+          onSave={handleSaveAgent}
+          onClose={() => setShowSaveAgentModal(false)}
         />
       )}
     </div>

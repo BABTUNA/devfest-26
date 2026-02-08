@@ -26,6 +26,21 @@ export function getInputSource(
 }
 
 /**
+ * Returns node IDs that have at least one edge (incoming or outgoing).
+ * Only these nodes can be run as part of the workflow.
+ */
+export function getConnectedNodeIds(nodes: Node[], edges: Edge[]): Set<string> {
+  const connected = new Set<string>();
+  edges.forEach((e) => {
+    if (nodes.some((n) => n.id === e.source) && nodes.some((n) => n.id === e.target)) {
+      connected.add(e.source);
+      connected.add(e.target);
+    }
+  });
+  return connected;
+}
+
+/**
  * Topological order of node ids (roots first). Returns null if cycle detected.
  */
 export function topologicalOrder(nodes: Node[], edges: Edge[]): string[] | null {
