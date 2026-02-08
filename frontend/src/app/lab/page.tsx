@@ -445,7 +445,11 @@ export default function DashboardPage() {
             setWorkflowError(json.error ?? `Failed at ${node.data?.label ?? nodeId}`);
             return;
           }
-          setNodeOutput(nodeId, json.outputs ?? {});
+          const outputs = json.outputs ?? {};
+          if (typeof window !== 'undefined' && outputs.audioBase64) {
+            console.log('[lab/page] workflow: audioBase64 preserved for node', nodeId, 'len=', String(outputs.audioBase64).length);
+          }
+          setNodeOutput(nodeId, outputs);
         }
       } catch (e) {
         setWorkflowError(e instanceof Error ? e.message : 'Workflow run failed');

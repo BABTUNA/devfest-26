@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { X, Play, Loader2, Lock, Link2, Coins } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { X, Play, Loader2, Lock, Link2, Coins, Volume2 } from 'lucide-react';
 import { getBlockById, type BlockId } from 'shared';
 import { useAppBilling } from '@/contexts/AppBillingContext';
 import { useTokens } from '@/contexts/TokenContext';
@@ -9,7 +9,10 @@ import { useExecutionLog } from '@/store/executionLog';
 import { useFlowRunStore } from '@/store/flowRunStore';
 import { getInputSource } from '@/lib/workflowLogic';
 import { DEMO_MODE, createCheckoutSession, runBlock } from '@/lib/api';
+import { hasAudioOutput } from '@/types/workflowTypes';
 import type { Node, Edge } from '@xyflow/react';
+
+const DEBUG_AUDIO = typeof process !== 'undefined' && process.env.NODE_ENV === 'development';
 
 type NodeData = { blockId: string; label: string; icon?: string };
 
@@ -37,6 +40,21 @@ export function RunBlockPanel({
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [output, setOutput] = useState<Record<string, unknown> | null>(() => getOutputs ?? null);
   const [error, setError] = useState<string | null>(null);
+
+  // Preserve audioBase64: sync output from flow run store when nodeId changes (e.g. switching to a node with cached output)
+  useEffect(() => {
+    const stored = useFlowRunStore.getState().outputsByNode[nodeId];
+    if (stored && Object.keys(stored).length > 0) {
+      setOutput((prev) => {
+        const next = { ...stored };
+        if (prev?.audioBase64 && !next.audioBase64) next.audioBase64 = prev.audioBase64;
+        return next;
+      });
+      if (DEBUG_AUDIO && stored.audioBase64) {
+        console.log('[RunBlockPanel] synced audioBase64 from store', nodeId, 'len=', String(stored.audioBase64).length);
+      }
+    }
+  }, [nodeId]);
   const [needsTokens, setNeedsTokens] = useState(false);
   const [loading, setLoading] = useState(false);
   const logAdd = useExecutionLog((s) => s.add);
@@ -114,6 +132,9 @@ export function RunBlockPanel({
         deductLocally(block.tokenCost);
       }
       const outputs = json.outputs ?? {};
+      if (DEBUG_AUDIO && outputs.audioBase64) {
+        console.log('[RunBlockPanel] handleRun: audioBase64 received', nodeId, 'len=', String(outputs.audioBase64).length);
+      }
       setOutput(outputs);
       setNodeOutput(nodeId, outputs);
       logAdd({ blockName: data.label, blockId: block.id, success: true, output: outputs });
@@ -223,10 +244,27 @@ export function RunBlockPanel({
         )}
         {error && <p className="text-sm text-rose-300">{error}</p>}
         {output != null && (
-          <div>
+          <div className="space-y-3">
             <p className="mb-1 text-xs font-medium text-app-soft">Output (cached for downstream)</p>
+            {hasAudioOutput(output) ? (
+              <div className="rounded-lg border border-app bg-app-card p-3">
+                <p className="mb-2 flex items-center gap-1.5 text-xs text-app-soft">
+                  <Volume2 className="h-3.5 w-3.5" />
+                  Audio playback
+                </p>
+                <audio
+                  controls
+                  className="w-full"
+                  src={`data:audio/mpeg;base64,${output.audioBase64}`}
+                >
+                  Your browser does not support the audio element.
+                </audio>
+              </div>
+            ) : null}
             <pre className="max-h-48 overflow-auto rounded-lg border border-app bg-app-card p-3 text-xs text-app-fg">
-              {JSON.stringify(output, null, 2)}
+              {hasAudioOutput(output)
+                ? JSON.stringify({ ...output, audioBase64: `[base64, ${String(output.audioBase64).length} chars]` }, null, 2)
+                : JSON.stringify(output, null, 2)}
             </pre>
           </div>
         )}

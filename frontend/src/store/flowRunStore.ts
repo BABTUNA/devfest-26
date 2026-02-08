@@ -1,8 +1,11 @@
 import { create } from 'zustand';
 
+const DEBUG_AUDIO = typeof process !== 'undefined' && process.env.NODE_ENV === 'development';
+
 /**
  * Stores the last run output per node, keyed by node id then output key.
  * Used to resolve "connected" inputs when running a downstream block or the whole workflow.
+ * Preserves audioBase64 and other large values without truncation.
  */
 export type FlowRunState = {
   /** nodeId -> { outputKey: value } from last run */
@@ -16,13 +19,17 @@ export type FlowRunState = {
 export const useFlowRunStore = create<FlowRunState>((set, get) => ({
   outputsByNode: {},
 
-  setNodeOutput: (nodeId, outputs) =>
-    set((state) => ({
+  setNodeOutput: (nodeId, outputs) => {
+    if (DEBUG_AUDIO && outputs?.audioBase64) {
+      console.log('[flowRunStore] setNodeOutput: audioBase64 preserved', { nodeId, len: String(outputs.audioBase64).length });
+    }
+    return set((state) => ({
       outputsByNode: {
         ...state.outputsByNode,
         [nodeId]: { ...outputs },
       },
-    })),
+    }));
+  },
 
   getOutput: (nodeId, outputKey) => {
     const nodeOut = get().outputsByNode[nodeId];
