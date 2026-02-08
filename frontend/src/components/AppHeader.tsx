@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { FlaskConical, Store } from 'lucide-react';
+import { FlaskConical, Store, PieChart, Activity } from 'lucide-react';
 import { TokenBalance } from './TokenBalance';
 import { TokenPurchaseModal } from './TokenPurchaseModal';
 import { UserDropdown } from './UserDropdown';
 
 const NAV = [
+  { href: '/analytics', label: 'Analytics', icon: PieChart },
+  { href: '/usage', label: 'Usage', icon: Activity },
   { href: '/marketplace', label: 'Marketplace', icon: Store },
   { href: '/lab', label: 'Lab', icon: FlaskConical },
 ] as const;
@@ -32,11 +34,10 @@ export function AppHeader() {
                 <Link
                   key={href}
                   href={href}
-                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
-                    isActive
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${isActive
                       ? 'bg-app-accent/20 text-blue-700 dark:text-blue-200'
                       : 'text-app-soft hover:bg-app-surface hover:text-app-fg'
-                  }`}
+                    }`}
                 >
                   <Icon className="h-4 w-4" />
                   {label}
