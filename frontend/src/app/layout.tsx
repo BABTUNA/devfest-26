@@ -28,7 +28,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var d=document.documentElement,s=localStorage.getItem('ai-block-marketplace-theme')||'dark';if(s==='system'){s=window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'}d.classList.add(s)}catch(e){d.classList.add('dark')}})()`,
+          }}
+        />
+      </head>
       <body className={`${manrope.variable} ${ibmPlexMono.variable} antialiased min-h-screen font-sans bg-app text-app-fg`}>
         <ThemeProvider>
           <TokenProvider>
