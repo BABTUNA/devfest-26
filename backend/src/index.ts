@@ -10,6 +10,7 @@ import { entitlementsRouter } from './routes/entitlements.js';
 import { checkoutRouter } from './routes/checkout.js';
 import { webhookRouter } from './routes/webhook.js';
 import { tokensRouter } from './routes/tokens.js';
+import { debugRouter } from './routes/debug.js';
 import { discountsRouter } from './routes/discounts.js';
 
 const app = express();
@@ -72,6 +73,7 @@ app.use('/api/entitlements', entitlementsRouter);
 app.use('/api/checkout', checkoutRouter);
 app.use('/api/webhook', webhookRouter);
 app.use('/api/tokens', tokensRouter);
+app.use('/api/debug', debugRouter);
 app.use('/api/discounts', discountsRouter);
 
 app.get('/health', (_req, res) => res.json({ ok: true }));

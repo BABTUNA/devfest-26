@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { flowglad } from '../lib/flowglad.js';
 import { getCustomerExternalId } from '../lib/auth.js';
+import { unlockUser } from '../store/tokenStore.js';
 import { BLOCK_DEFINITIONS } from 'shared';
 
 export const checkoutRouter = Router();
@@ -20,9 +21,17 @@ export function grantDemoEntitlement(userId: string, featureSlug: string): void 
   getDemoEntitlements(userId).add(featureSlug);
 }
 
+export function resetDemoEntitlements(userId: string): void {
+  demoEntitlements.delete(userId);
+}
+
 checkoutRouter.post('/', async (req, res) => {
   try {
     const userId = await getCustomerExternalId(req);
+
+    // Unlock user so they can purchase
+    unlockUser(userId);
+
     const { priceSlug, priceSlugs, successUrl, cancelUrl, outputName, outputMetadata } = req.body as {
       priceSlug: string;
       priceSlugs?: string[];

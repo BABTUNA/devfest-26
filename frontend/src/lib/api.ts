@@ -111,3 +111,23 @@ export async function runBlock(params: {
     body: params,
   });
 }
+
+export interface ResetResponse {
+  success: boolean;
+  message: string;
+  userId?: string;
+  balance?: number;
+  locked?: boolean;
+}
+
+export async function resetDemoState(): Promise<ResetResponse> {
+  return apiRequest<ResetResponse>('/api/debug/reset', {
+    method: 'POST',
+  });
+}
+
+export async function unlockDemoState(): Promise<ResetResponse> {
+  return apiRequest<ResetResponse>('/api/debug/unlock', {
+    method: 'POST',
+  });
+}

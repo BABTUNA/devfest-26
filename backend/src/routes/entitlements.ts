@@ -3,6 +3,7 @@ import { flowglad } from '../lib/flowglad.js';
 import { getCustomerExternalId } from '../lib/auth.js';
 import { BLOCK_DEFINITIONS } from 'shared';
 import { getDemoEntitlements } from './checkout.js';
+import { isUserLocked } from '../store/tokenStore.js';
 
 export const entitlementsRouter = Router();
 
@@ -42,7 +43,18 @@ interface FlowgladBillingResponse {
 entitlementsRouter.get('/', async (req, res) => {
   try {
     const userId = await getCustomerExternalId(req);
+
+
     const access: Record<string, boolean> = {};
+
+    // If user is locked (hard reset), return all features as locked
+    if (isUserLocked(userId)) {
+      for (const block of BLOCK_DEFINITIONS) {
+        access[block.featureSlug] = block.featureSlug === 'free';
+      }
+      console.log(`[Entitlements] User ${userId} is LOCKED - all non-free features disabled`);
+      return res.json({ entitlements: access, billing: { subscriptions: [] }, locked: true });
+    }
 
     if (DEMO_MODE) {
       // In demo mode, check our in-memory demo entitlements store

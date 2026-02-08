@@ -102,3 +102,29 @@ export function refreshSubscriptionTokens(userId: string, tokensToCredit: number
 
     console.log(`[Tokens] Subscription refresh for ${userId}: credited ${tokensToCredit} tokens. New balance: ${data.balance}`);
 }
+
+// --- Hard Reset / Lock Functionality ---
+
+const lockedUsers = new Set<string>();
+
+export function isUserLocked(userId: string): boolean {
+    return lockedUsers.has(userId);
+}
+
+export function lockUser(userId: string): void {
+    lockedUsers.add(userId);
+    console.log(`[Tokens] User ${userId} is now locked (all features disabled)`);
+}
+
+export function unlockUser(userId: string): void {
+    lockedUsers.delete(userId);
+    console.log(`[Tokens] User ${userId} is now unlocked`);
+}
+
+export function setTokenBalance(userId: string, balance: number): void {
+    const data = getUserTokenData(userId);
+    data.balance = balance;
+    data.creditedPurchases = []; // Clear credited purchases so they can be re-credited
+    tokenStore.set(userId, data);
+    console.log(`[Tokens] Set token balance for ${userId} to ${balance}`);
+}
