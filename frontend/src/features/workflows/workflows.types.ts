@@ -7,6 +7,10 @@ export type WorkflowRecord = {
   description: string | null;
   includes: string[];
   definition: WorkflowDefinition;
+  is_published?: boolean;
+  price_in_cents?: number | null;
+  flowglad_product_id?: string | null;
+  flowglad_price_id?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -25,6 +29,8 @@ export type CreateWorkflowInput = {
   name: string;
   description?: string;
   definition?: WorkflowDefinition;
+  isPublished?: boolean;
+  priceInCents?: number | null;
 };
 
 export type UpdateWorkflowPatch = {
@@ -32,4 +38,6 @@ export type UpdateWorkflowPatch = {
   description?: string | null;
   definition?: WorkflowDefinition;
   includes?: string[];
+  is_published?: boolean;
+  price_in_cents?: number;
 };

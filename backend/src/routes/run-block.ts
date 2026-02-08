@@ -5,6 +5,7 @@ import { getBlockById, type BlockId } from 'shared';
 import { runBlock } from '../services/run-block.js';
 import { deductTokens, getTokenBalance } from '../store/tokenStore.js';
 import { getDemoEntitlements } from './checkout.js';
+import { getWorkflowById, checkWorkflowAccess } from '../services/workflows.js';
 
 const DEMO_MODE = process.env.DEMO_MODE === 'true';
 const FLOWGLAD_API_URL = 'https://app.flowglad.com/api/v1';
@@ -83,12 +84,17 @@ runBlockRouter.post('/', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'blockId and inputs required' });
     }
 
+    const userId = await getCustomerExternalId(req);
+
+    // Check if this is a workflow block (starts with 'workflow_')
+    if (typeof blockId === 'string' && blockId.startsWith('workflow_')) {
+      return await handleWorkflowExecution(blockId, inputs, userId, res);
+    }
+
     const block = getBlockById(blockId);
     if (!block) {
       return res.status(404).json({ error: 'Block not found' });
     }
-
-    const userId = await getCustomerExternalId(req);
 
     // Check tokens (skip for free blocks with tokenCost 0)
     if (block.tokenCost > 0) {
@@ -187,3 +193,57 @@ runBlockRouter.post('/', requireAuth, async (req, res) => {
     return res.status(500).json({ error: 'Failed to run block' });
   }
 });
+
+/**
+ * Handle execution of workflow blocks.
+ * Workflow blocks are treated as opaque "super-blocks" that execute server-side.
+ */
+async function handleWorkflowExecution(
+  blockId: string,
+  inputs: Record<string, string | string[]>,
+  userId: string,
+  res: any
+): Promise<any> {
+  try {
+    // Extract workflow ID from blockId (format: 'workflow_<uuid>')
+    const workflowId = blockId.replace('workflow_', '');
+
+    // Fetch workflow
+    const workflow = await getWorkflowById(workflowId);
+    if (!workflow) {
+      return res.status(404).json({ error: 'Workflow not found' });
+    }
+
+    // Check access (user must own or have purchased the workflow)
+    const hasAccess = await checkWorkflowAccess(userId, workflowId);
+    if (!hasAccess) {
+      return res.status(403).json({
+        error: 'Workflow access denied',
+        message: 'You must purchase this workflow to execute it',
+      });
+    }
+
+    // Execute workflow (simplified for MVP - just return success)
+    // TODO: Implement full workflow graph execution (topological sort + sequential block runs)
+    console.log(`[RunBlock] Executing workflow ${workflowId} for user ${userId}`);
+    console.log(`[RunBlock] Workflow definition:`, JSON.stringify(workflow.definition).substring(0, 200));
+
+    // For MVP: return a placeholder output
+    // In production, this would execute the workflow graph and return real outputs
+    const outputs = {
+      output: 'Workflow executed successfully (MVP placeholder)',
+      workflowId,
+      workflowName: workflow.name,
+    };
+
+    return res.json({
+      success: true,
+      outputs,
+      tokensUsed: 0, // Workflows don't consume tokens (already paid for)
+      tokensRemaining: getTokenBalance(userId),
+    });
+  } catch (e) {
+    console.error('[RunBlock] Workflow execution error:', e);
+    return res.status(500).json({ error: 'Failed to execute workflow' });
+  }
+}

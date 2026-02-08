@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
+    "test": "SUPABASE_URL=http://127.0.0.1 SUPABASE_SERVICE_ROLE_KEY=test tsx --test \"src/**/*.test.ts\"",
     "start": "node dist/index.js",
     "flowglad:sync": "node scripts/sync-flowglad-config.mjs"
   },

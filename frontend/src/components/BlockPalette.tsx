@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Brain, Mail, PenLine, TestTube, FileStack, Play, Layers, Type, GitBranch,
   Search, Lock, Languages, Volume2, Mic, MessageSquare, Hash, Globe2,
-  ChevronDown, ChevronRight,
+  ChevronDown, ChevronRight, Sparkles,
 } from 'lucide-react';
 import { BLOCK_DEFINITIONS, type BlockDefinition, type BlockId } from 'shared';
 import { useAppBilling } from '@/contexts/AppBillingContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { getMyWorkflows, workflowToBlockDefinition } from '@/features/workflows/workflows.api';
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
@@ -27,6 +29,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   MessageSquare,
   Hash,
   Globe2,
+  Sparkles,
 };
 
 const DRAG_TYPE = 'application/reactflow';
@@ -36,7 +39,7 @@ function onDragStart(event: React.DragEvent, blockId: string, label: string, ico
   event.dataTransfer.effectAllowed = 'move';
 }
 
-type PaletteCategory = 'ai' | 'tool' | 'utility' | 'integration';
+type PaletteCategory = 'ai' | 'tool' | 'utility' | 'integration' | 'myAgents';
 
 const AI_BLOCK_IDS: BlockId[] = [
   'summarize-text', 'extract-emails', 'rewrite-prompt', 'classify-input',
@@ -46,6 +49,8 @@ const INTEGRATION_BLOCK_IDS: BlockId[] = ['send-slack', 'send-discord', 'fetch-u
 const UTILITY_BLOCK_IDS: BlockId[] = ['trigger', 'text-join', 'constant', 'conditional'];
 
 function getBlockCategory(block: BlockDefinition): PaletteCategory {
+  // Workflow agents go in "My Agents" category
+  if (block.id.toString().startsWith('workflow_')) return 'myAgents';
   if (AI_BLOCK_IDS.includes(block.id)) return 'ai';
   if (INTEGRATION_BLOCK_IDS.includes(block.id)) return 'integration';
   if (UTILITY_BLOCK_IDS.includes(block.id)) return 'utility';
@@ -53,13 +58,14 @@ function getBlockCategory(block: BlockDefinition): PaletteCategory {
 }
 
 const CATEGORY_META: Record<PaletteCategory, { dot: string; label: string }> = {
+  myAgents:    { dot: 'bg-purple-400',  label: 'My Agents' },
   ai:          { dot: 'bg-sky-400',     label: 'AI Blocks' },
   tool:        { dot: 'bg-emerald-400', label: 'Tools' },
   utility:     { dot: 'bg-amber-400',   label: 'Utilities' },
   integration: { dot: 'bg-violet-400',  label: 'Integrations' },
 };
 
-const CATEGORY_ORDER: PaletteCategory[] = ['ai', 'tool', 'utility', 'integration'];
+const CATEGORY_ORDER: PaletteCategory[] = ['myAgents', 'ai', 'tool', 'utility', 'integration'];
 
 function CategorySection({
   category,
@@ -134,19 +140,54 @@ export function BlockPalette({
 }) {
   const [search, setSearch] = useState('');
   const { hasFeatureAccess, loaded } = useAppBilling();
+  const { isAuthenticated } = useAuth();
+  const [workflowBlocks, setWorkflowBlocks] = useState<BlockDefinition[]>([]);
+  const [loadingWorkflows, setLoadingWorkflows] = useState(false);
+
+  // Fetch user workflows on mount
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setWorkflowBlocks([]);
+      return;
+    }
+
+    setLoadingWorkflows(true);
+    getMyWorkflows()
+      .then((workflows) => {
+        const blocks = workflows.map(workflowToBlockDefinition);
+        setWorkflowBlocks(blocks);
+      })
+      .catch((err) => {
+        console.error('[BlockPalette] Failed to fetch workflows:', err);
+      })
+      .finally(() => {
+        setLoadingWorkflows(false);
+      });
+  }, [isAuthenticated]);
+
+  // Combine static blocks with workflow blocks
+  const allBlocks = useMemo(() => {
+    return [...BLOCK_DEFINITIONS, ...workflowBlocks];
+  }, [workflowBlocks]);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return BLOCK_DEFINITIONS;
+    if (!search.trim()) return allBlocks;
     const q = search.toLowerCase();
-    return BLOCK_DEFINITIONS.filter(
+    return allBlocks.filter(
       (b) =>
         b.name.toLowerCase().includes(q) ||
         b.description.toLowerCase().includes(q)
     );
-  }, [search]);
+  }, [search, allBlocks]);
 
   const grouped = useMemo(() => {
-    const map: Record<PaletteCategory, BlockDefinition[]> = { ai: [], tool: [], utility: [], integration: [] };
+    const map: Record<PaletteCategory, BlockDefinition[]> = { 
+      myAgents: [], 
+      ai: [], 
+      tool: [], 
+      utility: [], 
+      integration: [] 
+    };
     for (const block of filtered) {
       map[getBlockCategory(block)].push(block);
     }

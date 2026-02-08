@@ -4,10 +4,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { Loader2, ShoppingBag, CheckCircle2 } from 'lucide-react';
 import { RequireAuth } from '@/components/RequireAuth';
 import { getSupabaseClient } from '@/lib/supabase';
-import { createPurchase, checkExistingPurchase } from '@/lib/purchases/createPurchase';
+import { checkExistingPurchase } from '@/lib/purchases/createPurchase';
+import { listWorkflows } from '@/features/workflows/workflows.api';
 
 type MarketplaceWorkflowCard = {
   id: string;
+  owner_user_id: string;
   name: string;
   description: string | null;
 };
@@ -16,6 +18,7 @@ function WorkflowMarketplaceContent() {
   const [workflows, setWorkflows] = useState<MarketplaceWorkflowCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [purchasedWorkflowIds, setPurchasedWorkflowIds] = useState<Set<string>>(new Set());
   const [purchasingWorkflowId, setPurchasingWorkflowId] = useState<string | null>(null);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
@@ -30,22 +33,18 @@ function WorkflowMarketplaceContent() {
       try {
         const supabase = getSupabaseClient();
 
-        // Load workflows
-        const { data, error: queryError } = await supabase
-          .from('workflows')
-          .select('id, name, description')
-          .order('updated_at', { ascending: false });
+        const result = await listWorkflows({ limit: 50 });
+        const data = result.workflows;
 
         if (!active) return;
-
-        if (queryError) {
-          throw new Error(queryError.message);
-        }
 
         setWorkflows((data ?? []) as MarketplaceWorkflowCard[]);
 
         // Check which workflows the user has already purchased
         const { data: { user } } = await supabase.auth.getUser();
+        if (active) {
+          setCurrentUserId(user?.id ?? null);
+        }
         if (user && data) {
           const purchased = new Set<string>();
           await Promise.all(
@@ -90,45 +89,52 @@ function WorkflowMarketplaceContent() {
         throw new Error('Please sign in to purchase workflows');
       }
 
-      // Check if already purchased or has pending purchase
+      // Check if already purchased
       const existingPurchase = await checkExistingPurchase(user.id, workflow.id);
-      if (existingPurchase) {
-        if (existingPurchase.status === 'paid') {
-          throw new Error('You have already purchased this workflow');
-        } else {
-          throw new Error('You already have a pending purchase for this workflow. Please complete or cancel it first.');
-        }
+      if (existingPurchase && existingPurchase.status === 'paid') {
+        throw new Error('You have already purchased this workflow');
       }
 
-      // Show confirmation dialog
-      const confirmed = window.confirm(
-        `Purchase "${workflow.name}" for $5.00?\n\n` +
-        `This is a development purchase flow. In production, this would redirect to payment checkout.`
-      );
-
-      if (!confirmed) {
-        setPurchasingWorkflowId(null);
-        return;
+      if (workflow.owner_user_id === user.id) {
+        throw new Error('Owners cannot purchase their own workflow.');
       }
 
-      // Create purchase record with 'paid' status (dev mode)
-      await createPurchase({
-        workflowId: workflow.id,
-        userId: user.id,
-        provider: 'dev',
-        amount: 500, // $5.00 in cents
-        currency: 'usd',
-        status: 'paid', // Directly mark as paid in dev mode
+      // Get session token for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Please sign in to continue');
+      }
+
+      // Call checkout API
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          workflowId: workflow.id,
+          successUrl: `${window.location.origin}/marketplace?success=true&workflowId=${workflow.id}`,
+          cancelUrl: `${window.location.origin}/marketplace?canceled=true`,
+        }),
       });
 
-      // Update UI to show purchased state
-      setPurchasedWorkflowIds((prev) => new Set([...prev, workflow.id]));
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to initiate checkout');
+      }
 
-      // Show success message
-      window.alert(`Successfully purchased "${workflow.name}"!`);
+      const { checkoutSession } = await res.json();
+
+      if (checkoutSession?.url) {
+        // Redirect to Flowglad Checkout
+        window.location.href = checkoutSession.url;
+      } else {
+        throw new Error('Invalid checkout session response');
+      }
+
     } catch (err) {
       setPurchaseError(err instanceof Error ? err.message : 'Failed to start purchase');
-    } finally {
       setPurchasingWorkflowId(null);
     }
   }, []);
@@ -158,6 +164,7 @@ function WorkflowMarketplaceContent() {
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {workflows.map((workflow) => {
                 const isPurchased = purchasedWorkflowIds.has(workflow.id);
+                const isOwner = currentUserId === workflow.owner_user_id;
                 const isPurchasing = purchasingWorkflowId === workflow.id;
 
                 return (
@@ -176,10 +183,10 @@ function WorkflowMarketplaceContent() {
                     </p>
 
                     <div className="mt-4">
-                      {isPurchased ? (
+                      {isPurchased || isOwner ? (
                         <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 dark:border-emerald-500/35 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300">
                           <CheckCircle2 className="h-4 w-4" />
-                          Purchased
+                          {isOwner ? 'Owned' : 'Purchased'}
                         </div>
                       ) : (
                         <button

@@ -24,6 +24,7 @@ export interface PaymentSucceededEvent extends WebhookEvent {
     type: 'payment.succeeded';
     object: 'payment';
     customer: CustomerInfo;
+    metadata?: Record<string, any>;
 }
 
 export interface SubscriptionCreatedEvent extends WebhookEvent {
@@ -60,6 +61,7 @@ export interface PurchaseCompletedEvent extends WebhookEvent {
     type: 'purchase.completed';
     object: 'purchase';
     customer: CustomerInfo;
+    metadata?: Record<string, unknown>;
 }
 
 export type FlowgladWebhookEvent =

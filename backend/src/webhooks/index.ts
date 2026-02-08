@@ -6,12 +6,9 @@ import { Request, Response } from 'express';
 import { verifyWebhook, WebhookVerificationError } from './verify.js';
 import { getWebhookConfig } from './config.js';
 import { logWebhook, logWebhookError, recordWebhookMetric } from './logging.js';
-import { MemoryIdempotencyStore } from './idempotency/memory.js';
 import { routeEvent } from './router.js';
 import { FlowgladWebhookEvent } from './types.js';
-
-// Global idempotency store (in-memory for MVP)
-const idempotencyStore = new MemoryIdempotencyStore();
+import { reserveFlowgladWebhookEvent } from '../services/webhookEvents.js';
 
 /**
  * Main webhook handler - verifies signature, deduplicates, and processes events
@@ -41,8 +38,13 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
             mode: config.mode,
         });
 
-        // Check for duplicate delivery (idempotency)
-        if (await idempotencyStore.has(event.id)) {
+        // Durable idempotency: reserve event id in DB. Duplicate insert means already processed.
+        const reserveResult = await reserveFlowgladWebhookEvent(
+            event.id,
+            event.type,
+            event as unknown as Record<string, unknown>
+        );
+        if (reserveResult === 'duplicate') {
             const durationMs = Date.now() - startTime;
             logWebhook('duplicate', event.id, {
                 eventType: event.type,
@@ -59,9 +61,6 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
             res.status(200).json({ received: true, duplicate: true });
             return;
         }
-
-        // Record event as processed
-        await idempotencyStore.record(event.id);
 
         // Route event to appropriate handler
         await routeEvent(event);

@@ -1,7 +1,9 @@
 import { Router } from 'express';
-import { flowglad } from '../lib/flowglad.js';
 import { getCustomerExternalId, requireAuth } from '../lib/auth.js';
 import { BLOCK_DEFINITIONS } from 'shared';
+import { getWorkflowById, getWorkflowsByIds } from '../services/workflows.js';
+import { evaluateWorkflowCheckoutGate } from '../services/checkoutGating.js';
+import { supabase } from '../lib/supabase.js';
 
 export const checkoutRouter = Router();
 
@@ -20,36 +22,97 @@ export function grantDemoEntitlement(userId: string, featureSlug: string): void 
   getDemoEntitlements(userId).add(featureSlug);
 }
 
+function logWorkflowGate(payload: Record<string, unknown>): void {
+  console.log(`[Checkout][WorkflowGate] ${JSON.stringify(payload)}`);
+}
+
+/**
+ * Simple checkout: directly creates purchase record without Flowglad.
+ * No payment processing - just grants access immediately.
+ */
 checkoutRouter.post('/', requireAuth, async (req, res) => {
   try {
     const userId = await getCustomerExternalId(req);
-    const { priceSlug, priceSlugs, successUrl, cancelUrl, outputName, outputMetadata } = req.body as {
-      priceSlug: string;
-      priceSlugs?: string[];
+    const { successUrl, workflowId } = req.body as {
       successUrl: string;
-      cancelUrl: string;
-      outputName?: string;
-      outputMetadata?: Record<string, string | number | boolean>;
+      cancelUrl?: string;
+      workflowId?: string;
     };
 
-    const candidates = [priceSlug, ...(Array.isArray(priceSlugs) ? priceSlugs : [])].filter(
-      (slug, index, arr): slug is string => typeof slug === 'string' && slug.length > 0 && arr.indexOf(slug) === index
-    );
-
-    console.log(`[Checkout] Request for customer: ${userId}, prices: ${candidates.join(', ')}`);
-
-    if (!candidates.length || !successUrl || !cancelUrl) {
-      return res.status(400).json({ error: 'priceSlug (or priceSlugs), successUrl, cancelUrl required' });
+    if (!successUrl) {
+      return res.status(400).json({ error: 'successUrl required' });
     }
 
-    if (DEMO_MODE) {
-      for (const candidate of candidates) {
-        const block = BLOCK_DEFINITIONS.find((b) => b.priceSlug === candidate);
-        if (block) {
-          grantDemoEntitlement(userId, block.featureSlug);
-        }
+    // Handle workflow checkout (no Flowglad, just direct purchase)
+    if (workflowId) {
+      const workflow = await getWorkflowById(workflowId);
+      const includedWorkflows = workflow?.includes?.length ? await getWorkflowsByIds(workflow.includes) : [];
+      const gateResult = evaluateWorkflowCheckoutGate({
+        workflow,
+        buyerUserId: userId,
+        includedWorkflows,
+      });
+
+      const gateContext = {
+        workflow_id: workflowId,
+        buyer_user_id: userId,
+        workflow_owner_user_id: workflow?.owner_user_id ?? null,
+        includes_count: workflow?.includes?.length ?? 0,
+      };
+
+      if (!gateResult.allowed) {
+        logWorkflowGate({
+          ...gateContext,
+          reason: gateResult.reason,
+          allowed: false,
+          ...(gateResult.details ?? {}),
+        });
+
+        return res.status(gateResult.status).json({
+          error: gateResult.error,
+          reason: gateResult.reason,
+        });
       }
 
+      // Create purchase record directly (no payment processing)
+      const { error: purchaseError } = await supabase
+        .from('purchases')
+        .upsert({
+          buyer_user_id: userId,
+          workflow_id: workflowId,
+          status: 'paid',
+          provider: 'direct',
+          amount: 0,
+          currency: 'USD',
+          metadata: { direct_checkout: true },
+        }, { onConflict: 'buyer_user_id,workflow_id' });
+
+      if (purchaseError) {
+        console.error('[Checkout] Failed to create purchase:', purchaseError);
+        return res.status(500).json({ error: 'Failed to record purchase' });
+      }
+
+      logWorkflowGate({
+        ...gateContext,
+        reason: gateResult.reason,
+        allowed: true,
+        purchase_created: true,
+      });
+
+      console.log(`[Checkout] Direct purchase created for workflow ${workflowId} by user ${userId}`);
+
+      // Return success URL directly (no external checkout)
+      return res.json({
+        checkoutSession: {
+          id: `direct_${workflowId}_${Date.now()}`,
+          url: successUrl,
+        },
+        direct: true,
+      });
+    }
+
+    // Handle block checkout (demo mode only for now)
+    if (DEMO_MODE) {
       return res.json({
         checkoutSession: {
           id: `demo_session_${Date.now()}`,
@@ -59,90 +122,12 @@ checkoutRouter.post('/', requireAuth, async (req, res) => {
       });
     }
 
-    const fgClient = flowglad(userId);
-
-    // Step 1: Ensure customer exists
-    console.log('[Checkout] Creating/finding customer...');
-    await fgClient.findOrCreateCustomer();
-    console.log('[Checkout] Customer ready');
-
-    // Step 2: Create checkout session
-    console.log('[Checkout] Creating checkout session...');
-    let result: unknown;
-    let selectedPriceSlug: string | null = null;
-    let lastError: unknown = null;
-    for (const candidate of candidates) {
-      try {
-        result = await fgClient.createCheckoutSession({
-          priceSlug: candidate,
-          successUrl,
-          cancelUrl,
-          outputName,
-          outputMetadata,
-        });
-        selectedPriceSlug = candidate;
-        break;
-      } catch (error) {
-        lastError = error;
-        const message =
-          typeof error === 'object' && error && 'message' in error
-            ? String((error as { message?: unknown }).message ?? '')
-            : '';
-        if (!message.toLowerCase().includes('not found')) {
-          throw error;
-        }
-      }
-    }
-
-    if (!selectedPriceSlug) {
-      const fallbackMessage = `Unable to create checkout session. Tried price slugs: ${candidates.join(', ')}`;
-      if (lastError && typeof lastError === 'object') {
-        const message = 'message' in lastError ? String((lastError as { message?: unknown }).message ?? '') : '';
-        throw new Error(message ? `${fallbackMessage}. Last error: ${message}` : fallbackMessage);
-      }
-      throw new Error(fallbackMessage);
-    }
-
-    console.log(`[Checkout] Success with priceSlug="${selectedPriceSlug}"`, JSON.stringify(result, null, 2));
-    const topLevelUrl =
-      typeof result === 'object' && result && 'url' in result
-        ? (result as { url?: unknown }).url
-        : undefined;
-    const rawSession =
-      typeof result === 'object' && result && 'checkoutSession' in result
-        ? (result as { checkoutSession?: unknown }).checkoutSession
-        : result;
-    const sessionUrlFromNested =
-      typeof rawSession === 'object' && rawSession && 'url' in rawSession
-        ? (rawSession as { url?: unknown }).url
-        : undefined;
-    const finalUrl = typeof sessionUrlFromNested === 'string' && sessionUrlFromNested
-      ? sessionUrlFromNested
-      : typeof topLevelUrl === 'string' && topLevelUrl
-        ? topLevelUrl
-        : undefined;
-
-    if (!finalUrl) {
-      return res.status(502).json({
-        error: 'Checkout session missing URL from Flowglad. Verify DEMO_MODE=false, FLOWGLAD_SECRET_KEY, and valid priceSlug.',
-      });
-    }
-
-    const checkoutSession =
-      rawSession && typeof rawSession === 'object'
-        ? ({ ...(rawSession as Record<string, unknown>), url: finalUrl })
-        : { url: finalUrl };
-
-    res.json({ checkoutSession });
+    return res.status(400).json({ error: 'workflowId required for checkout' });
   } catch (e: unknown) {
-    // Extract detailed error info
-    const err = e as { message?: string; error?: { error?: string }; status?: number };
-    const message = err?.error?.error || err?.message || 'Unknown error';
-    const status = err?.status || 500;
+    const err = e as { message?: string };
+    const message = err?.message || 'Unknown error';
 
     console.error('[Checkout] Error:', message);
-    console.error('[Checkout] Full error:', JSON.stringify(e, null, 2));
-
-    res.status(status).json({ error: message });
+    res.status(500).json({ error: message });
   }
 });

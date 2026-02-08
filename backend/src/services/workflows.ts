@@ -1,7 +1,12 @@
 import { supabase, Workflow } from '../lib/supabase.js';
+import { canAccessWorkflow, hasPaidWorkflowPurchase } from './purchases.js';
 
 const DEFAULT_LIST_LIMIT = 20;
 const MAX_LIST_LIMIT = 100;
+
+const FLOWGLAD_API_URL = 'https://app.flowglad.com/api/v1';
+const FLOWGLAD_SECRET_KEY = process.env.FLOWGLAD_SECRET_KEY;
+const PRICING_MODEL_ID = process.env.FLOWGLAD_PRICING_MODEL_ID || 'pricing_model_fDYzbCCeVKczlBpCLDEPC';
 
 export class WorkflowNotFoundError extends Error {
   constructor(message = 'Workflow not found') {
@@ -20,6 +25,9 @@ export type ListWorkflowsResult = {
   nextCursor: string | null;
 };
 
+// Commerce columns (is_published, price_in_cents, flowglad_product_id, flowglad_price_id)
+// are not part of the current schema. Commerce features are disabled.
+
 function normalizeLimit(limit?: number): number {
   if (!Number.isFinite(limit)) {
     return DEFAULT_LIST_LIMIT;
@@ -30,6 +38,8 @@ function normalizeLimit(limit?: number): number {
 /**
  * List workflows for the marketplace, newest first.
  * Cursor is the previous page's last updated_at value.
+ * Note: Filtering by flowglad_price_id requires migration 003 to be run.
+ * For now, returns all workflows.
  */
 export async function listWorkflows(options: ListWorkflowsOptions = {}): Promise<ListWorkflowsResult> {
   const limit = normalizeLimit(options.limit);
@@ -63,12 +73,114 @@ export async function listWorkflows(options: ListWorkflowsOptions = {}): Promise
 }
 
 /**
+ * Flowglad sync disabled - commerce columns not in schema
+ */
+async function syncWorkflowToFlowglad(workflow: Workflow): Promise<void> {
+  console.log('[Workflows] Flowglad sync skipped - commerce columns not available');
+  return;
+
+  try {
+    const slug = `workflow_${workflow.id}`;
+    const name = workflow.name;
+    const priceInCents = workflow.price_in_cents || 500; // Default $5
+
+    console.log(`[Workflows] Syncing workflow ${workflow.id} to Flowglad...`);
+
+    const flowgladPayload = {
+      product: {
+        name,
+        slug,
+        description: workflow.description || '',
+        pricingModelId: PRICING_MODEL_ID,
+        active: true,
+        default: false,
+      },
+      price: {
+        type: 'single_payment',
+        name: `${name} Price`,
+        slug: slug,
+        unitPrice: priceInCents,
+        active: true,
+        isDefault: true,
+      },
+      featureIds: [],
+    };
+
+    const flowgladRes = await fetch(`${FLOWGLAD_API_URL}/products`, {
+      method: 'POST',
+      headers: {
+        'Authorization': FLOWGLAD_SECRET_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(flowgladPayload),
+    });
+
+    if (!flowgladRes.ok) {
+      // Check if it already exists (conflict)
+      if (flowgladRes.status === 409 || flowgladRes.status === 400) {
+        console.warn(`[Workflows] Product might already exist for ${slug}. Checking...`);
+        // Fetch existing to get ID? For now, just log and skip update
+        // Ideally we fetch it by slug and update our DB
+        const getRes = await fetch(`${FLOWGLAD_API_URL}/products?slug=${slug}`, {
+          headers: { 'Authorization': FLOWGLAD_SECRET_KEY }
+        });
+        if (getRes.ok) {
+          const data = await getRes.json() as any;
+          const existing = data.products?.find((p: any) => p.slug === slug);
+          if (existing) {
+            console.log(`[Workflows] Found existing product ${existing.id}, linking...`);
+            const existingPriceSlug =
+              normalizePriceSlug(existing.defaultPrice?.slug) ??
+              normalizePriceSlug(existing.defaultPrice?.id) ??
+              slug;
+            await supabase
+              .from('workflows')
+              .update({
+                flowglad_product_id: existing.id,
+                flowglad_price_id: existingPriceSlug
+              })
+              .eq('id', workflow.id);
+            return;
+          }
+        }
+      }
+      const text = await flowgladRes.text();
+      throw new Error(`Failed to create product in Flowglad: ${flowgladRes.status} ${text}`);
+    }
+
+    const responseData = await flowgladRes.json() as any;
+    const product = responseData.product;
+    const price = responseData.price || product.defaultPrice;
+
+    if (product && price) {
+      const mappedPriceSlug = normalizePriceSlug(price.slug) ?? normalizePriceSlug(price.id) ?? slug;
+      await supabase
+        .from('workflows')
+        .update({
+          flowglad_product_id: product.id,
+          flowglad_price_id: mappedPriceSlug
+        })
+        .eq('id', workflow.id);
+      console.log(`[Workflows] Synced workflow ${workflow.id} -> Product ${product.id}`);
+      return;
+    }
+
+    throw new Error('Flowglad product sync did not return a default price mapping');
+
+  } catch (err) {
+    console.error('[Workflows] Error syncing to Flowglad:', err);
+    throw err instanceof Error ? err : new Error('Unknown Flowglad sync error');
+  }
+}
+
+/**
  * Create a new workflow.
  * 
  * @param userId - The owner user ID
  * @param name - Workflow name
  * @param description - Optional workflow description
  * @param definition - Optional workflow definition (JSONB)
+ * @param isPublished - Whether to publish to marketplace
  */
 export async function createWorkflow(
   userId: string,
@@ -83,7 +195,7 @@ export async function createWorkflow(
       name,
       description: description || null,
       definition: definition || {},
-      includes: [],
+      includes: []
     })
     .select()
     .single();
@@ -162,6 +274,22 @@ export async function getWorkflowById(workflowId: string): Promise<Workflow | nu
   }
 
   return data;
+}
+
+export async function getWorkflowsByIds(workflowIds: string[]): Promise<Workflow[]> {
+  if (workflowIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('workflows')
+    .select('*')
+    .in('id', workflowIds);
+
+  if (error) {
+    console.error('[Workflows] Error fetching workflows by ids:', error);
+    throw new Error(`Failed to fetch workflow includes: ${error.message}`);
+  }
+
+  return data ?? [];
 }
 
 /**
@@ -302,13 +430,13 @@ async function checkForCycles(
 ): Promise<void> {
   // Fetch all user workflows to build dependency graph
   const workflows = await getUserWorkflows(userId);
-  
+
   // Build adjacency map
   const graph = new Map<string, string[]>();
   workflows.forEach((w) => {
     graph.set(w.id, w.includes || []);
   });
-  
+
   // Temporarily update the graph with new includes
   graph.set(startWorkflowId, newIncludes);
 
@@ -341,4 +469,25 @@ async function checkForCycles(
   if (dfs(startWorkflowId)) {
     throw new Error('Circular dependency detected in workflow includes');
   }
+}
+
+/**
+ * Check if a user has access to a workflow.
+ * Access is granted if:
+ * 1. User is the owner
+ * 2. User has a confirmed 'paid' purchase for the workflow
+ */
+export async function checkWorkflowAccess(userId: string, workflowId: string): Promise<boolean> {
+  // 1. Check if owner
+  const workflow = await getWorkflowById(workflowId);
+  if (!workflow) return false;
+
+  // 2. Check if purchased (paid)
+  const hasPaidPurchase = await hasPaidWorkflowPurchase(userId, workflowId);
+
+  return canAccessWorkflow({
+    workflowOwnerUserId: workflow.owner_user_id,
+    requesterUserId: userId,
+    hasPaidPurchase,
+  });
 }

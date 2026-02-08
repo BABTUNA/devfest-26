@@ -63,3 +63,18 @@ export interface Workflow {
   created_at: string;
   updated_at: string;
 }
+
+export interface Purchase {
+  id: string;
+  buyer_user_id: string;
+  workflow_id: string;
+  status: 'pending' | 'paid' | 'failed' | 'refunded' | 'cancelled';
+  provider: string;
+  provider_payment_id: string | null;
+  provider_event_id: string | null;
+  amount: number | null;
+  currency: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}

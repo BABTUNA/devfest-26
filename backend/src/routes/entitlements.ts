@@ -3,6 +3,7 @@ import { flowglad } from '../lib/flowglad.js';
 import { getCustomerExternalId, requireAuth } from '../lib/auth.js';
 import { BLOCK_DEFINITIONS } from 'shared';
 import { getDemoEntitlements } from './checkout.js';
+import { supabase } from '../lib/supabase.js';
 
 export const entitlementsRouter = Router();
 
@@ -137,6 +138,34 @@ entitlementsRouter.get('/', requireAuth, async (req, res) => {
       if (!access[slug]) {
         access[slug] = true;
       }
+    }
+
+    // Add workflow entitlements: owned workflows + purchased workflows
+    try {
+      // Get workflows the user owns
+      const { data: ownedWorkflows } = await supabase
+        .from('workflows')
+        .select('id')
+        .eq('owner_user_id', userId);
+
+      for (const workflow of ownedWorkflows || []) {
+        access[`workflow_${workflow.id}`] = true;
+      }
+
+      // Get workflows the user has purchased (status: paid)
+      const { data: purchasedWorkflows } = await supabase
+        .from('purchases')
+        .select('workflow_id')
+        .eq('buyer_user_id', userId)
+        .eq('status', 'paid');
+
+      for (const purchase of purchasedWorkflows || []) {
+        access[`workflow_${purchase.workflow_id}`] = true;
+      }
+
+      console.log(`[Entitlements] User ${userId} workflow access: ${ownedWorkflows?.length || 0} owned, ${purchasedWorkflows?.length || 0} purchased`);
+    } catch (e) {
+      console.error('[Entitlements] Failed to fetch workflow entitlements:', e);
     }
 
     console.log(`[Entitlements] User ${userId} final access:`, Object.entries(access).filter(([, v]) => v).map(([k]) => k));

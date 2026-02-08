@@ -2,7 +2,7 @@
  * Event router - dispatches webhook events to appropriate handlers
  */
 
-import { FlowgladWebhookEvent } from '../types.js';
+import { FlowgladWebhookEvent } from './types.js';
 import { handlers } from './handlers/index.js';
 import { logWebhook, logWebhookError } from './logging.js';
 
@@ -33,10 +33,11 @@ export async function routeEvent(event: FlowgladWebhookEvent): Promise<void> {
             eventType: event.type,
         });
     } catch (error) {
-        // Log handler errors but don't throw (return 200 to prevent retries)
+        // Log and rethrow so Flowglad can retry transient failures.
         const err = error as Error;
         logWebhookError('handler-failed', event.id, err, {
             eventType: event.type,
         });
+        throw err;
     }
 }

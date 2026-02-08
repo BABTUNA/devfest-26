@@ -49,6 +49,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { CreateProductModal } from '@/components/CreateProductModal';
 import { RequireAuth } from '@/components/RequireAuth';
 import { runBlock as runBlockApi } from '@/lib/api';
+import { useAppBilling } from '@/contexts/AppBillingContext';
 
 type FlowNode = BlockFlowNode;
 type FlowEdge = Edge;
@@ -337,6 +338,7 @@ export default function DashboardPage() {
     setNodes(saved.nodes);
     setEdges(saved.edges);
   }, [setNodes, setEdges]);
+
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const [runPanelNode, setRunPanelNode] = useState<RunPanelState>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
@@ -350,6 +352,12 @@ export default function DashboardPage() {
   const { isVisible, setVisible } = useExecutionLog();
   const { resolvedTheme } = useTheme();
   const [showCreateProductModal, setShowCreateProductModal] = useState(false);
+  const { refreshEntitlements } = useAppBilling();
+
+  // Refresh entitlements on mount to sync after purchases
+  useEffect(() => {
+    refreshEntitlements();
+  }, [refreshEntitlements]);
 
   useEffect(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
