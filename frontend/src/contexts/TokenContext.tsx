@@ -9,6 +9,7 @@ interface TokenContextValue {
     loading: boolean;
     refresh: () => Promise<void>;
     deductLocally: (amount: number) => void;
+    verifyPurchases: () => Promise<{ tokensAdded: number }>;
 }
 
 const TokenContext = createContext<TokenContextValue>({
@@ -16,6 +17,7 @@ const TokenContext = createContext<TokenContextValue>({
     loading: true,
     refresh: async () => { },
     deductLocally: () => { },
+    verifyPurchases: async () => ({ tokensAdded: 0 }),
 });
 
 export function TokenProvider({ children }: { children: ReactNode }) {
@@ -42,12 +44,41 @@ export function TokenProvider({ children }: { children: ReactNode }) {
         setBalance((prev) => Math.max(0, prev - amount));
     };
 
+    // Verify and credit any pending Flowglad purchases
+    const verifyPurchases = async (): Promise<{ tokensAdded: number }> => {
+        try {
+            const res = await fetch(`${API_URL}/api/tokens/verify-purchase`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-User-Id': 'demo-user-2',
+                },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.tokensAdded > 0) {
+                    setBalance(data.newBalance);
+                    console.log(`[Tokens] Verified ${data.purchasesProcessed} purchases, added ${data.tokensAdded} tokens`);
+                }
+                return { tokensAdded: data.tokensAdded ?? 0 };
+            }
+        } catch (e) {
+            console.error('[Tokens] Failed to verify purchases:', e);
+        }
+        return { tokensAdded: 0 };
+    };
+
     useEffect(() => {
-        refresh();
+        // On mount, verify purchases first (in case returning from checkout), then refresh balance
+        const init = async () => {
+            await verifyPurchases();
+            await refresh();
+        };
+        init();
     }, []);
 
     return (
-        <TokenContext.Provider value={{ balance, loading, refresh, deductLocally }}>
+        <TokenContext.Provider value={{ balance, loading, refresh, deductLocally, verifyPurchases }}>
             {children}
         </TokenContext.Provider>
     );

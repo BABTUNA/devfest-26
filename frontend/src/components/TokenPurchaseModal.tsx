@@ -2,10 +2,63 @@
 
 import { useState } from 'react';
 import { X, Coins, Zap, Calendar, Loader2 } from 'lucide-react';
-import { TOKEN_PACKS, TOKEN_SUBSCRIPTIONS, type TokenPack, type TokenSubscription } from 'shared';
 import { useTokens } from '@/contexts/TokenContext';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+
+// Define token packs locally to avoid import issues
+interface TokenPack {
+    id: string;
+    name: string;
+    tokens: number;
+    priceUsd: number;
+    priceSlug: string;
+}
+
+interface TokenSubscription {
+    id: string;
+    name: string;
+    tokensPerPeriod: number;
+    priceUsd: number;
+    priceSlug: string;
+    interval: 'week' | 'month';
+}
+
+const TOKEN_PACKS: TokenPack[] = [
+    {
+        id: 'starter',
+        name: 'Starter Pack',
+        tokens: 100,
+        priceUsd: 5,
+        priceSlug: 'starter_pack',
+    },
+    {
+        id: 'pro',
+        name: 'Pro Pack',
+        tokens: 500,
+        priceUsd: 20,
+        priceSlug: 'pro_pack',
+    },
+];
+
+const TOKEN_SUBSCRIPTIONS: TokenSubscription[] = [
+    {
+        id: 'monthly',
+        name: 'Monthly Plan',
+        tokensPerPeriod: 200,
+        priceUsd: 10,
+        priceSlug: 'monthly_plan',
+        interval: 'month',
+    },
+    {
+        id: 'weekly',
+        name: 'Weekly Plan',
+        tokensPerPeriod: 50,
+        priceUsd: 3,
+        priceSlug: 'weekly_plan',
+        interval: 'week',
+    },
+];
 
 interface TokenPurchaseModalProps {
     isOpen: boolean;
@@ -98,7 +151,7 @@ export function TokenPurchaseModal({ isOpen, onClose }: TokenPurchaseModalProps)
                             Token Packs (One-time)
                         </h3>
                         <div className="grid gap-3">
-                            {TOKEN_PACKS.map((pack: TokenPack) => (
+                            {TOKEN_PACKS.map((pack) => (
                                 <button
                                     key={pack.id}
                                     onClick={() => handlePurchase(pack.priceSlug, pack.name)}
@@ -127,7 +180,7 @@ export function TokenPurchaseModal({ isOpen, onClose }: TokenPurchaseModalProps)
                             Subscriptions (Recurring)
                         </h3>
                         <div className="grid gap-3">
-                            {TOKEN_SUBSCRIPTIONS.map((sub: TokenSubscription) => (
+                            {TOKEN_SUBSCRIPTIONS.map((sub) => (
                                 <button
                                     key={sub.id}
                                     onClick={() => handlePurchase(sub.priceSlug, sub.name)}

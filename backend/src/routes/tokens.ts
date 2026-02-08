@@ -1,12 +1,48 @@
 import { Router } from 'express';
 import { getCustomerExternalId } from '../lib/auth.js';
 import { getTokenBalance, getUserTokenData, creditTokens } from '../store/tokenStore.js';
-import { getTokenProductByPriceSlug, TOKEN_PACKS, TOKEN_SUBSCRIPTIONS } from 'shared';
 import { flowglad } from '../lib/flowglad.js';
 
 export const tokensRouter = Router();
 
 const DEMO_MODE = process.env.DEMO_MODE === 'true';
+const FLOWGLAD_API_URL = 'https://app.flowglad.com/api/v1';
+const FLOWGLAD_SECRET_KEY = process.env.FLOWGLAD_SECRET_KEY;
+
+// Token pack definitions (local to avoid shared import issues)
+interface TokenPack {
+    id: string;
+    name: string;
+    tokens: number;
+    priceUsd: number;
+    priceSlug: string;
+    type: 'one_time';
+}
+
+interface TokenSubscription {
+    id: string;
+    name: string;
+    tokensPerPeriod: number;
+    priceUsd: number;
+    priceSlug: string;
+    interval: 'week' | 'month';
+    type: 'subscription';
+}
+
+const TOKEN_PACKS: TokenPack[] = [
+    { id: 'starter', name: 'Starter Pack', tokens: 100, priceUsd: 5, priceSlug: 'starter_pack', type: 'one_time' },
+    { id: 'pro', name: 'Pro Pack', tokens: 500, priceUsd: 20, priceSlug: 'pro_pack', type: 'one_time' },
+];
+
+const TOKEN_SUBSCRIPTIONS: TokenSubscription[] = [
+    { id: 'monthly', name: 'Monthly Plan', tokensPerPeriod: 200, priceUsd: 10, priceSlug: 'monthly_plan', interval: 'month', type: 'subscription' },
+    { id: 'weekly', name: 'Weekly Plan', tokensPerPeriod: 50, priceUsd: 3, priceSlug: 'weekly_plan', interval: 'week', type: 'subscription' },
+];
+
+function getTokenProductByPriceSlug(priceSlug: string) {
+    return TOKEN_PACKS.find((p) => p.priceSlug === priceSlug) ||
+        TOKEN_SUBSCRIPTIONS.find((s) => s.priceSlug === priceSlug);
+}
 
 // GET /api/tokens - Get user's token balance
 tokensRouter.get('/', async (req, res) => {
@@ -79,6 +115,104 @@ tokensRouter.post('/purchase', async (req, res) => {
     } catch (e) {
         console.error('token purchase error', e);
         res.status(500).json({ error: 'Failed to create checkout session' });
+    }
+});
+
+// POST /api/tokens/verify-purchase - Check Flowglad for recent purchases and credit tokens
+tokensRouter.post('/verify-purchase', async (req, res) => {
+    try {
+        const userId = await getCustomerExternalId(req);
+
+        if (!FLOWGLAD_SECRET_KEY) {
+            return res.status(500).json({ error: 'Flowglad not configured' });
+        }
+
+        // Fetch user's billing data from Flowglad
+        const billingRes = await fetch(`${FLOWGLAD_API_URL}/customers/${userId}/billing`, {
+            method: 'GET',
+            headers: {
+                'Authorization': FLOWGLAD_SECRET_KEY,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!billingRes.ok) {
+            console.warn(`[Tokens] Failed to fetch billing for user ${userId}: ${billingRes.status}`);
+            return res.status(500).json({ error: 'Failed to fetch purchases' });
+        }
+
+        const billingData = await billingRes.json() as {
+            purchases?: Array<{ id: string; priceId: string; createdAt: number }>;
+            catalog?: {
+                products?: Array<{
+                    id: string;
+                    slug: string;
+                    defaultPrice?: { id: string; slug: string };
+                    prices?: Array<{ id: string; slug: string }>;
+                }>;
+            };
+        };
+
+        // Build priceId -> productSlug map
+        const priceIdToSlug = new Map<string, string>();
+        if (billingData.catalog?.products) {
+            for (const product of billingData.catalog.products) {
+                if (product.defaultPrice) {
+                    priceIdToSlug.set(product.defaultPrice.id, product.slug);
+                }
+                if (product.prices) {
+                    for (const price of product.prices) {
+                        priceIdToSlug.set(price.id, product.slug);
+                    }
+                }
+            }
+        }
+
+        // Get user's existing credited purchases (stored in tokenStore)
+        const userData = getUserTokenData(userId);
+        const creditedPurchases = new Set(userData.creditedPurchases ?? []);
+
+        let tokensAdded = 0;
+        const newCredits: string[] = [];
+
+        // Check each purchase and credit tokens if not already credited
+        if (billingData.purchases) {
+            for (const purchase of billingData.purchases) {
+                // Skip if already credited
+                if (creditedPurchases.has(purchase.id)) {
+                    continue;
+                }
+
+                const productSlug = priceIdToSlug.get(purchase.priceId);
+                if (!productSlug) continue;
+
+                // Check if this is a token product
+                const tokenProduct = getTokenProductByPriceSlug(productSlug);
+                if (tokenProduct) {
+                    const tokens = tokenProduct.type === 'one_time' ? tokenProduct.tokens : tokenProduct.tokensPerPeriod;
+                    creditTokens(userId, tokens, `flowglad purchase: ${purchase.id}`);
+                    tokensAdded += tokens;
+                    newCredits.push(purchase.id);
+                    console.log(`[Tokens] Credited ${tokens} tokens to ${userId} for purchase ${purchase.id}`);
+                }
+            }
+        }
+
+        // Update credited purchases list
+        if (newCredits.length > 0) {
+            userData.creditedPurchases = [...(userData.creditedPurchases ?? []), ...newCredits];
+        }
+
+        const newBalance = getUserTokenData(userId).balance;
+        res.json({
+            success: true,
+            tokensAdded,
+            newBalance,
+            purchasesProcessed: newCredits.length,
+        });
+    } catch (e) {
+        console.error('token verify-purchase error', e);
+        res.status(500).json({ error: 'Failed to verify purchases' });
     }
 });
 

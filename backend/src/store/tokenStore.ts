@@ -5,6 +5,7 @@ interface UserTokenData {
     lastRefresh: Date;
     subscriptionId?: string;
     subscriptionInterval?: 'week' | 'month';
+    creditedPurchases?: string[]; // Track Flowglad purchase IDs that have been credited
 }
 
 const tokenStore = new Map<string, UserTokenData>();
