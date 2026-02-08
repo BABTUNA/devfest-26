@@ -13,16 +13,20 @@ export type LogEntry = {
 type ExecutionLogState = {
   entries: LogEntry[];
   maxEntries: number;
+  isVisible: boolean;
   add: (entry: Omit<LogEntry, 'id' | 'at'>) => void;
+  setVisible: (visible: boolean) => void;
   clear: () => void;
 };
 
 export const useExecutionLog = create<ExecutionLogState>((set) => ({
   entries: [],
   maxEntries: 50,
+  isVisible: false,
 
   add: (entry) =>
     set((state) => ({
+      isVisible: true,
       entries: [
         {
           ...entry,
@@ -33,5 +37,6 @@ export const useExecutionLog = create<ExecutionLogState>((set) => ({
       ].slice(0, state.maxEntries),
     })),
 
+  setVisible: (visible: boolean) => set({ isVisible: visible }),
   clear: () => set({ entries: [] }),
 }));

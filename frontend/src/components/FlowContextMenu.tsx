@@ -41,7 +41,7 @@ export function FlowContextMenu({
   return (
     <div
       ref={ref}
-      className="fixed z-50 min-w-[160px] rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl py-1"
+      className="fixed z-50 min-w-[160px] rounded-xl border border-app bg-app-surface shadow-xl py-1 backdrop-blur"
       style={{ left: x, top: y }}
     >
       {items.map((item, i) => (
@@ -54,8 +54,8 @@ export function FlowContextMenu({
           }}
           className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition ${
             item.danger
-              ? 'text-red-400 hover:bg-red-900/30'
-              : 'text-zinc-200 hover:bg-zinc-800'
+              ? 'text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10'
+              : 'text-app-fg hover:bg-app-card'
           }`}
         >
           {item.icon}

@@ -15,12 +15,22 @@ import {
   useReactFlow,
   type Connection,
   type Edge,
+  type OnEdgesChange,
+  type OnNodesChange,
   type Node,
   type NodeTypes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Home } from 'lucide-react';
-import { BlockNode } from '@/components/BlockNode';
+import {
+  Home,
+  ScrollText,
+  Play,
+  WandSparkles,
+  LayoutGrid,
+  Trash2,
+  PackagePlus,
+} from 'lucide-react';
+import { BlockNode, type BlockFlowNode, type BlockNodeData } from '@/components/BlockNode';
 import { BlockPalette } from '@/components/BlockPalette';
 import { RunBlockPanel } from '@/components/RunBlockPanel';
 import { ExecutionLogPanel } from '@/components/ExecutionLogPanel';
@@ -34,10 +44,16 @@ import { getBlockById } from 'shared';
 import { topologicalOrder, getEntryInputs, getInputSource } from '@/lib/workflowLogic';
 import { EntryInputsModal, type EntryInputField } from '@/components/EntryInputsModal';
 import { useFlowRunStore } from '@/store/flowRunStore';
+import { useExecutionLog } from '@/store/executionLog';
+import { useTheme } from '@/contexts/ThemeContext';
+import { CreateProductModal } from '@/components/CreateProductModal';
+
+type FlowNode = BlockFlowNode;
+type FlowEdge = Edge;
 
 const nodeTypes: NodeTypes = { block: BlockNode };
 
-const DEFAULT_NODES: Node[] = [
+const DEFAULT_NODES: FlowNode[] = [
   {
     id: '1',
     type: 'block',
@@ -52,13 +68,13 @@ const DEFAULT_NODES: Node[] = [
   },
 ];
 
-const DEFAULT_EDGES: Edge[] = [];
+const DEFAULT_EDGES: FlowEdge[] = [];
 
 /** Test workflow: Constant → Summarize Text. Use "Prepopulate" button to load this. */
-function getPrepopulateFlow(): { nodes: Node[]; edges: Edge[] } {
+function getPrepopulateFlow(): { nodes: FlowNode[]; edges: FlowEdge[] } {
   const constantBlock = getBlockById('constant');
   const summarizeBlock = getBlockById('summarize-text');
-  const nodes: Node[] = [
+  const nodes: FlowNode[] = [
     {
       id: 'prepop-constant',
       type: 'block',
@@ -80,7 +96,7 @@ function getPrepopulateFlow(): { nodes: Node[]; edges: Edge[] } {
       },
     },
   ];
-  const edges: Edge[] = [
+  const edges: FlowEdge[] = [
     {
       id: 'prepop-e1',
       source: 'prepop-constant',
@@ -94,12 +110,12 @@ function getPrepopulateFlow(): { nodes: Node[]; edges: Edge[] } {
 
 const FLOW_STORAGE_KEY = 'devfest-flow';
 
-function loadFlow(): { nodes: Node[]; edges: Edge[] } {
+function loadFlow(): { nodes: FlowNode[]; edges: FlowEdge[] } {
   if (typeof window === 'undefined') return { nodes: DEFAULT_NODES, edges: DEFAULT_EDGES };
   try {
     const raw = localStorage.getItem(FLOW_STORAGE_KEY);
     if (!raw) return { nodes: DEFAULT_NODES, edges: DEFAULT_EDGES };
-    const parsed = JSON.parse(raw) as { nodes?: Node[]; edges?: Edge[] };
+    const parsed = JSON.parse(raw) as { nodes?: FlowNode[]; edges?: FlowEdge[] };
     if (Array.isArray(parsed.nodes) && Array.isArray(parsed.edges)) {
       return { nodes: parsed.nodes, edges: parsed.edges };
     }
@@ -111,8 +127,8 @@ function loadFlow(): { nodes: Node[]; edges: Edge[] } {
 
 const DRAG_TYPE = 'application/reactflow';
 
-type ContextMenuState = { node: Node; x: number; y: number } | null;
-type RunPanelState = { id: string; data: { blockId: string; label: string; icon?: string } } | null;
+type ContextMenuState = { node: FlowNode; x: number; y: number } | null;
+type RunPanelState = { id: string; data: BlockNodeData } | null;
 
 function FlowCanvas({
   nodes,
@@ -128,13 +144,15 @@ function FlowCanvas({
   selectedNodeIds,
   setSelectedNodeIds,
   removeNodes,
+  onNodeDoubleClick,
+  theme,
 }: {
-  nodes: Node[];
-  setNodes: (u: Node[] | ((prev: Node[]) => Node[])) => void;
-  onNodesChange: (changes: unknown) => void;
-  edges: Edge[];
-  setEdges: (u: Edge[] | ((prev: Edge[]) => Edge[])) => void;
-  onEdgesChange: (changes: unknown) => void;
+  nodes: FlowNode[];
+  setNodes: (u: FlowNode[] | ((prev: FlowNode[]) => FlowNode[])) => void;
+  onNodesChange: OnNodesChange<FlowNode>;
+  edges: FlowEdge[];
+  setEdges: (u: FlowEdge[] | ((prev: FlowEdge[]) => FlowEdge[])) => void;
+  onEdgesChange: OnEdgesChange<FlowEdge>;
   contextMenu: ContextMenuState;
   setContextMenu: (v: ContextMenuState) => void;
   runPanelNode: RunPanelState;
@@ -142,8 +160,14 @@ function FlowCanvas({
   selectedNodeIds: string[];
   setSelectedNodeIds: (ids: string[]) => void;
   removeNodes: (ids: string[]) => void;
+  onNodeDoubleClick: (event: React.MouseEvent, node: FlowNode) => void;
+  theme: 'dark' | 'light';
 }) {
   const { screenToFlowPosition } = useReactFlow();
+  const isDark = theme === 'dark';
+  const majorGrid = isDark ? '#475569' : '#94a3b8';
+  const minorGrid = isDark ? '#334155' : '#b0bec5';
+  const lineColor = isDark ? '#22c55e' : '#15803d';
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -171,7 +195,7 @@ function FlowCanvas({
         x: event.clientX,
         y: event.clientY,
       });
-      const newNode: Node = {
+      const newNode: FlowNode = {
         id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         type: 'block',
         position: { x: position.x - 90, y: position.y - 24 },
@@ -187,7 +211,7 @@ function FlowCanvas({
   );
 
   const handleNodeContextMenu = useCallback(
-    (event: React.MouseEvent, node: Node) => {
+    (event: React.MouseEvent, node: FlowNode) => {
       event.preventDefault();
       setContextMenu({ node, x: event.clientX, y: event.clientY });
     },
@@ -195,7 +219,7 @@ function FlowCanvas({
   );
 
   const onSelectionChange = useCallback(
-    ({ nodes: selected }: { nodes: Node[] }) => {
+    ({ nodes: selected }: { nodes: FlowNode[] }) => {
       setSelectedNodeIds(selected.map((n) => n.id));
     },
     [setSelectedNodeIds]
@@ -224,24 +248,24 @@ function FlowCanvas({
 
   const menuItems = contextMenu
     ? [
-        runBlockItem(() => {
-          if (contextMenu.node.data) {
-            setRunPanelNode({
-              id: contextMenu.node.id,
-              data: {
-                blockId: String(contextMenu.node.data.blockId),
-                label: String(contextMenu.node.data.label),
-                icon: contextMenu.node.data.icon,
-              },
-            });
-          }
-          setContextMenu(null);
-        }),
-        removeNodeItem(() => {
-          removeNodes([contextMenu.node.id]);
-          setContextMenu(null);
-        }),
-      ]
+      runBlockItem(() => {
+        if (contextMenu.node.data) {
+          setRunPanelNode({
+            id: contextMenu.node.id,
+            data: {
+              blockId: String(contextMenu.node.data.blockId),
+              label: String(contextMenu.node.data.label),
+              icon: contextMenu.node.data.icon,
+            },
+          });
+        }
+        setContextMenu(null);
+      }),
+      removeNodeItem(() => {
+        removeNodes([contextMenu.node.id]);
+        setContextMenu(null);
+      }),
+    ]
     : [];
 
   return (
@@ -255,32 +279,36 @@ function FlowCanvas({
         onDrop={onDrop}
         onDragOver={onDragOver}
         onNodeContextMenu={handleNodeContextMenu}
+        onNodeDoubleClick={onNodeDoubleClick}
         onSelectionChange={onSelectionChange}
         onPaneClick={handlePaneClick}
         nodeTypes={nodeTypes}
         fitView
-        className="bg-zinc-950"
+        colorMode={isDark ? 'dark' : 'light'}
+        style={{ '--xy-background-color': `rgb(${isDark ? '2,6,23' : '248,250,252'})` } as React.CSSProperties}
         snapToGrid
         snapGrid={[16, 16]}
         defaultEdgeOptions={{ type: 'default' }}
-        connectionLineStyle={{ stroke: '#10b981', strokeWidth: 2 }}
+        connectionLineStyle={{ stroke: lineColor, strokeWidth: 2 }}
       >
-        <Background color="#27272a" gap={16} size={1} />
-        <Background color="#3f3f46" gap={80} size={1} />
-        <Controls className="!bg-zinc-800 !border-zinc-700" />
+        <Background color={minorGrid} gap={16} size={1.5} />
+        <Background color={majorGrid} gap={80} size={2} />
+        <Controls className="!border-app !bg-app-surface !text-app-soft" />
         <MiniMap
-          nodeColor="#10b981"
-          maskColor="rgb(24,24,27,0.8)"
-          className="!bg-zinc-900 !border-zinc-700"
+          nodeColor={lineColor}
+          maskColor={isDark ? 'rgba(2,6,23,0.78)' : 'rgba(226,232,240,0.72)'}
+          className="!border-app !bg-app-surface"
         />
-        <Panel position="top-center" className="flex gap-2">
-          <span className="text-zinc-500 text-xs">Drag from palette or click block to add • Right-click: Run or Remove • Del to remove</span>
+        <Panel position="top-center" className="rounded-full border border-app bg-app-surface px-3 py-1.5 shadow-sm backdrop-blur">
+          <span className="text-app-soft text-xs">
+            Drag to add blocks, connect outputs to inputs, double-click nodes to run
+          </span>
         </Panel>
         {nodes.length === 0 && (
-          <Panel position="top-left" className="mt-24 ml-24 max-w-sm">
-            <div className="rounded-xl border border-zinc-700 bg-zinc-900/90 p-4 text-zinc-400 text-sm shadow-lg">
-              <p className="font-medium text-zinc-200">Canvas empty</p>
-              <p className="mt-1">Drag blocks from the palette or click a block to add it here.</p>
+          <Panel position="top-left" className="mt-20 ml-8 max-w-sm">
+            <div className="rounded-2xl border border-app bg-app-surface p-4 text-app-soft text-sm shadow-lg backdrop-blur">
+              <p className="font-semibold text-app-fg">Start your flow</p>
+              <p className="mt-1">Drag blocks from the left panel or click a block to place it on canvas.</p>
             </div>
           </Panel>
         )}
@@ -298,9 +326,15 @@ function FlowCanvas({
 }
 
 export default function DashboardPage() {
-  const [initial] = useState(() => loadFlow());
-  const [nodes, setNodes, onNodesChange] = useNodesState(initial.nodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
+  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(DEFAULT_NODES);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>(DEFAULT_EDGES);
+
+  // Load from localStorage only after hydration to avoid mismatch
+  useEffect(() => {
+    const saved = loadFlow();
+    setNodes(saved.nodes);
+    setEdges(saved.edges);
+  }, [setNodes, setEdges]);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const [runPanelNode, setRunPanelNode] = useState<RunPanelState>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
@@ -311,6 +345,9 @@ export default function DashboardPage() {
   const setNodeOutput = useFlowRunStore((s) => s.setNodeOutput);
   const getOutput = useFlowRunStore((s) => s.getOutput);
   const clearRunCache = useFlowRunStore((s) => s.clearAll);
+  const { isVisible, setVisible } = useExecutionLog();
+  const { resolvedTheme } = useTheme();
+  const [showCreateProductModal, setShowCreateProductModal] = useState(false);
 
   useEffect(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -445,7 +482,7 @@ export default function DashboardPage() {
         x: 120 + (nodes.length % 4) * 240,
         y: 100 + Math.floor(nodes.length / 4) * 120,
       };
-      const newNode: Node = {
+      const newNode: FlowNode = {
         id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         type: 'block',
         position: { x: pos.x, y: pos.y },
@@ -484,8 +521,8 @@ export default function DashboardPage() {
       reader.onload = () => {
         try {
           const json = JSON.parse(reader.result as string) as {
-            nodes?: Node[];
-            edges?: Edge[];
+            nodes?: FlowNode[];
+            edges?: FlowEdge[];
           };
           if (Array.isArray(json.nodes)) setNodes(json.nodes);
           if (Array.isArray(json.edges)) setEdges(json.edges);
@@ -520,7 +557,6 @@ export default function DashboardPage() {
     }
     const remaining = nodes.filter((n) => !assigned.has(n.id)).map((n) => n.id);
     if (remaining.length > 0) layers.push(remaining);
-    const nodeMap = new Map(nodes.map((n) => [n.id, n]));
     const padX = 220;
     const padY = 100;
     setNodes((prev) =>
@@ -544,92 +580,124 @@ export default function DashboardPage() {
   }, [nodes, edges, setNodes]);
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-zinc-800 bg-zinc-900/80 shrink-0">
-        <Link
-          href="/"
-          className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-        >
-          <Home className="h-4 w-4" />
-          Home
-        </Link>
-        <button
-          type="button"
-          onClick={handleRunWorkflow}
-          disabled={nodes.length === 0 || workflowRunning}
-          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {workflowRunning ? 'Running…' : 'Run workflow'}
-        </button>
-        <button
-          type="button"
-          onClick={handleRunSelected}
-          disabled={selectedNodeIds.length !== 1}
-          className="rounded-lg bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-600 disabled:opacity-40"
-        >
-          Run selected
-        </button>
-        <button
-          type="button"
-          onClick={clearRunCache}
-          className="rounded-lg bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-600"
-          title="Clear cached outputs (so connected inputs need re-run)"
-        >
-          Clear cache
-        </button>
-        <button
-          type="button"
-          onClick={handleClearCanvas}
-          className="rounded-lg bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-600"
-        >
-          Clear canvas
-        </button>
-        <button
-          type="button"
-          onClick={handlePrepopulate}
-          className="rounded-lg bg-amber-600/80 px-3 py-1.5 text-sm font-medium text-zinc-100 hover:bg-amber-500/80"
-          title="Load a test workflow (Constant → Summarize Text) and clear run cache"
-        >
-          Prepopulate
-        </button>
-        <button
-          type="button"
-          onClick={handleAutoLayout}
-          disabled={nodes.length === 0}
-          className="rounded-lg bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-600 disabled:opacity-40"
-        >
-          Auto-layout
-        </button>
-        <button
-          type="button"
-          onClick={handleExport}
-          className="rounded-lg bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-600"
-        >
-          Export
-        </button>
-        <button type="button" onClick={handleImport} className="rounded-lg bg-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-600">
-          Import
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json,application/json"
-          className="hidden"
-          onChange={handleFileChange}
-        />
-        <span className="text-zinc-500 text-xs ml-2">
-          {nodes.length} block{nodes.length !== 1 ? 's' : ''}
-        </span>
-        {workflowError && (
-          <span className="text-red-400 text-xs ml-2" title={workflowError}>
-            {workflowError}
+    <div className="mx-auto flex w-full max-w-7xl flex-1 min-h-0 flex-col px-4 py-6 md:px-6 md:py-8">
+      <div className="mb-5 rounded-2xl border border-app bg-app-surface/75 p-4 md:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-app-fg">Lab</h1>
+            <p className="mt-1 text-sm text-app-soft">
+              Build block-based workflows, run them end-to-end, and inspect outputs as you iterate.
+            </p>
+          </div>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
+          >
+            <Home className="h-4 w-4" />
+            Home
+          </Link>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleRunWorkflow}
+            disabled={nodes.length === 0 || workflowRunning}
+            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Play className="h-4 w-4" />
+            {workflowRunning ? 'Running…' : 'Run workflow'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowCreateProductModal(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-500"
+          >
+            <PackagePlus className="h-4 w-4" />
+            Create Agent
+          </button>
+          <button
+            type="button"
+            onClick={handleRunSelected}
+            disabled={selectedNodeIds.length !== 1}
+            className="inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg disabled:opacity-40"
+          >
+            <WandSparkles className="h-4 w-4" />
+            Run selected
+          </button>
+          <button
+            type="button"
+            onClick={handleAutoLayout}
+            disabled={nodes.length === 0}
+            className="inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg disabled:opacity-40"
+          >
+            <LayoutGrid className="h-4 w-4" />
+            Auto-layout
+          </button>
+          <button
+            type="button"
+            onClick={handlePrepopulate}
+            className="rounded-lg border border-amber-300 dark:border-amber-500/35 bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-700 dark:text-amber-300 transition hover:bg-amber-100 dark:hover:bg-amber-500/20"
+            title="Load Constant → Summarize test flow"
+          >
+            Prepopulate
+          </button>
+          <button
+            type="button"
+            onClick={() => setVisible(!isVisible)}
+            className={`inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm transition ${isVisible
+              ? 'bg-blue-100 dark:bg-blue-600/15 text-blue-700 dark:text-blue-300'
+              : 'text-app-soft hover:bg-app-surface hover:text-app-fg'
+              }`}
+          >
+            <ScrollText className="h-4 w-4" />
+            Logs
+          </button>
+          <button
+            type="button"
+            onClick={handleImport}
+            className="rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
+          >
+            Import
+          </button>
+          <button
+            type="button"
+            onClick={handleExport}
+            className="rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
+          >
+            Export
+          </button>
+          <button
+            type="button"
+            onClick={clearRunCache}
+            className="rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
+            title="Clear cached outputs"
+          >
+            Clear cache
+          </button>
+          <button
+            type="button"
+            onClick={handleClearCanvas}
+            className="inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-rose-300"
+          >
+            <Trash2 className="h-4 w-4" />
+            Clear canvas
+          </button>
+          <span className="ml-auto rounded-full border border-app px-2.5 py-1 text-xs text-app-soft">
+            {nodes.length} block{nodes.length !== 1 ? 's' : ''}
           </span>
+        </div>
+        {workflowError && (
+          <p className="mt-3 rounded-lg border border-rose-300 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 px-3 py-2 text-sm text-rose-700 dark:text-rose-300">
+            {workflowError}
+          </p>
         )}
       </div>
-      <div className="flex-1 flex min-h-0">
+
+      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[260px_1fr]">
         <BlockPalette onAddBlock={addBlockAt} />
-        <div className="flex-1 min-h-0 flex">
-          <div className="flex-1 min-h-0">
+        <div className="flex min-h-0 overflow-hidden rounded-2xl border border-app bg-app-surface/70">
+          <div className="min-h-0 flex-1">
             <ReactFlowProvider>
               <FlowCanvas
                 nodes={nodes}
@@ -645,6 +713,19 @@ export default function DashboardPage() {
                 selectedNodeIds={selectedNodeIds}
                 setSelectedNodeIds={setSelectedNodeIds}
                 removeNodes={removeNodes}
+                theme={resolvedTheme}
+                onNodeDoubleClick={(e, node) => {
+                  if (node.data) {
+                    setRunPanelNode({
+                      id: node.id,
+                      data: {
+                        blockId: String(node.data.blockId),
+                        label: String(node.data.label),
+                        icon: node.data.icon,
+                      },
+                    });
+                  }
+                }}
               />
             </ReactFlowProvider>
           </div>
@@ -659,12 +740,28 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json,application/json"
+        className="hidden"
+        onChange={handleFileChange}
+      />
       <ExecutionLogPanel />
       {entryModalFields && entryModalFields.length > 0 && (
         <EntryInputsModal
           fields={entryModalFields}
           onSubmit={(values) => runWorkflowWithEntryValues(values)}
           onCancel={() => setEntryModalFields(null)}
+        />
+      )}
+      {showCreateProductModal && (
+        <CreateProductModal
+          onClose={() => setShowCreateProductModal(false)}
+          onSuccess={(product) => {
+            setShowCreateProductModal(false);
+            window.alert(`Agent "${product.name}" created successfully! Check the Marketplace.`);
+          }}
         />
       )}
     </div>
