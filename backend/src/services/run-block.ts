@@ -5,6 +5,13 @@ import { runExtractEmails } from './ai/extract-emails.js';
 import { runRewritePrompt } from './ai/rewrite-prompt.js';
 import { runClassifyInput } from './ai/classify-input.js';
 import { runMergePdfs } from './merge-pdfs.js';
+import { runTranslateText } from './ai/translate.js';
+import { runTextToSpeech } from './ai/text-to-speech.js';
+import { runSpeechToText } from './ai/speech-to-text.js';
+import { runSendSlack } from './integrations/send-slack.js';
+import { runSendDiscord } from './integrations/send-discord.js';
+import { runFetchUrl } from './fetch-url.js';
+import { runBrowserAgent } from './browser-agent.js';
 
 export async function runBlock(
   blockId: BlockId,
@@ -36,8 +43,8 @@ export async function runBlock(
     }
     case 'merge-pdfs': {
       const files = inputs['files'];
-      const mergedUrl = await runMergePdfs(Array.isArray(files) ? files : files ? [files] : []);
-      return { mergedUrl };
+      const mergedPdf = await runMergePdfs(Array.isArray(files) ? files : files ? [files] : []);
+      return { mergedPdf };
     }
     case 'trigger': {
       return { trigger: true };
@@ -58,6 +65,53 @@ export async function runBlock(
       const pattern = String(inputs['pattern'] ?? '').trim();
       const match = pattern ? text.includes(pattern) : text.length > 0;
       return { match };
+    }
+    case 'translate-text': {
+      const text = String(inputs['text'] ?? '');
+      const targetLanguage = String(inputs['targetLanguage'] ?? 'English');
+      const translated = await runTranslateText(text, targetLanguage);
+      return { translated };
+    }
+    case 'text-to-speech': {
+      const text = String(inputs['text'] ?? '');
+      const voiceId = String(inputs['voiceId'] ?? '');
+      const audioBase64 = await runTextToSpeech(text, voiceId || undefined);
+      return { audioBase64 };
+    }
+    case 'speech-to-text': {
+      const audio = String(inputs['audioBase64'] ?? '');
+      const language = String(inputs['language'] ?? '');
+      const transcription = await runSpeechToText(audio, language || undefined);
+      return { transcription };
+    }
+    case 'send-slack': {
+      const webhookUrl = String(inputs['webhookUrl'] ?? '');
+      const message = String(inputs['message'] ?? inputs['text'] ?? '');
+      const status = await runSendSlack(webhookUrl, message);
+      return { status };
+    }
+    case 'send-discord': {
+      const webhookUrl = String(inputs['webhookUrl'] ?? '');
+      const message = String(inputs['message'] ?? inputs['text'] ?? '');
+      const status = await runSendDiscord(webhookUrl, message);
+      return { status };
+    }
+    case 'fetch-url': {
+      const url = String(inputs['url'] ?? inputs['text'] ?? '');
+      const { body, statusCode } = await runFetchUrl(url);
+      return { body, statusCode };
+    }
+    case 'audio-player': {
+      // Audio player is handled client-side only
+      const audioBase64 = String(inputs['audioBase64'] ?? '');
+      return { audioBase64, played: false };
+    }
+    case 'browser-agent': {
+      const url = String(inputs['url'] ?? '');
+      const waitForSelector = inputs['waitForSelector'] ? String(inputs['waitForSelector']) : undefined;
+      const extractSelector = inputs['extractSelector'] ? String(inputs['extractSelector']) : undefined;
+      const result = await runBrowserAgent({ url, waitForSelector, extractSelector });
+      return { text: result.text, title: result.title, success: result.success };
     }
     default:
       throw new Error(`Unimplemented block: ${blockId}`);

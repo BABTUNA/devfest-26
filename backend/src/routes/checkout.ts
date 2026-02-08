@@ -12,7 +12,12 @@ const demoEntitlements = new Map<string, Set<string>>();
 
 export function getDemoEntitlements(userId: string): Set<string> {
   if (!demoEntitlements.has(userId)) {
-    demoEntitlements.set(userId, new Set());
+    // In demo mode, grant access to all blocks by default
+    const allFeatures = new Set<string>();
+    for (const block of BLOCK_DEFINITIONS) {
+      allFeatures.add(block.featureSlug);
+    }
+    demoEntitlements.set(userId, allFeatures);
   }
   return demoEntitlements.get(userId)!;
 }

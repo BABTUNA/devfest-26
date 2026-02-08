@@ -5,6 +5,7 @@ import { expressRouter } from '@flowglad/server/express';
 import { flowglad } from './lib/flowglad.js';
 import { getCustomerExternalId } from './lib/auth.js';
 import { runBlockRouter } from './routes/run-block.js';
+import { runWorkflowRouter } from './routes/run-workflow.js';
 import { productsRouter } from './routes/products.js';
 import { entitlementsRouter } from './routes/entitlements.js';
 import { checkoutRouter } from './routes/checkout.js';
@@ -23,7 +24,8 @@ console.log('FLOWGLAD_SECRET_KEY prefix:', process.env.FLOWGLAD_SECRET_KEY?.subs
 console.log('============================');
 
 app.use(cors({ origin: process.env.FRONTEND_URL ?? 'http://localhost:3000', credentials: true }));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' })); // Increased limit for audio base64 data
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Global request logger
 app.use((req, res, next) => {
@@ -61,6 +63,7 @@ if (!DEMO_MODE) {
 }
 
 app.use('/api/run-block', runBlockRouter);
+app.use('/api/run-workflow', runWorkflowRouter);
 app.use('/api/products', productsRouter);
 app.use('/api/entitlements', entitlementsRouter);
 app.use('/api/checkout', checkoutRouter);
