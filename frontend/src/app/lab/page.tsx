@@ -28,6 +28,7 @@ import {
   WandSparkles,
   LayoutGrid,
   Trash2,
+  PackagePlus,
 } from 'lucide-react';
 import { BlockNode, type BlockFlowNode, type BlockNodeData } from '@/components/BlockNode';
 import { BlockPalette } from '@/components/BlockPalette';
@@ -45,6 +46,7 @@ import { EntryInputsModal, type EntryInputField } from '@/components/EntryInputs
 import { useFlowRunStore } from '@/store/flowRunStore';
 import { useExecutionLog } from '@/store/executionLog';
 import { useTheme } from '@/contexts/ThemeContext';
+import { CreateProductModal } from '@/components/CreateProductModal';
 
 type FlowNode = BlockFlowNode;
 type FlowEdge = Edge;
@@ -344,6 +346,7 @@ export default function DashboardPage() {
   const clearRunCache = useFlowRunStore((s) => s.clearAll);
   const { isVisible, setVisible } = useExecutionLog();
   const { theme } = useTheme();
+  const [showCreateProductModal, setShowCreateProductModal] = useState(false);
 
   useEffect(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -602,6 +605,14 @@ export default function DashboardPage() {
           </button>
           <button
             type="button"
+            onClick={() => setShowCreateProductModal(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-500"
+          >
+            <PackagePlus className="h-4 w-4" />
+            Create Agent
+          </button>
+          <button
+            type="button"
             onClick={handleRunSelected}
             disabled={selectedNodeIds.length !== 1}
             className="inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg disabled:opacity-40"
@@ -629,11 +640,10 @@ export default function DashboardPage() {
           <button
             type="button"
             onClick={() => setVisible(!isVisible)}
-            className={`inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm transition ${
-              isVisible
-                ? 'bg-blue-600/15 text-blue-300'
-                : 'text-app-soft hover:bg-app-surface hover:text-app-fg'
-            }`}
+            className={`inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm transition ${isVisible
+              ? 'bg-blue-600/15 text-blue-300'
+              : 'text-app-soft hover:bg-app-surface hover:text-app-fg'
+              }`}
           >
             <ScrollText className="h-4 w-4" />
             Logs
@@ -738,6 +748,15 @@ export default function DashboardPage() {
           fields={entryModalFields}
           onSubmit={(values) => runWorkflowWithEntryValues(values)}
           onCancel={() => setEntryModalFields(null)}
+        />
+      )}
+      {showCreateProductModal && (
+        <CreateProductModal
+          onClose={() => setShowCreateProductModal(false)}
+          onSuccess={(product) => {
+            setShowCreateProductModal(false);
+            window.alert(`Agent "${product.name}" created successfully! Check the Marketplace.`);
+          }}
         />
       )}
     </div>

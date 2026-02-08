@@ -34,6 +34,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Layers,
   Type,
   GitBranch,
+  Sparkles,
 };
 
 export default function LibraryPage() {
@@ -261,11 +262,10 @@ export default function LibraryPage() {
                     key={value}
                     type="button"
                     onClick={() => setStatusFilter(value)}
-                    className={`rounded-full border px-3 py-1 text-xs transition ${
-                      statusFilter === value
+                    className={`rounded-full border px-3 py-1 text-xs transition ${statusFilter === value
                         ? 'border-blue-500/45 bg-blue-500/15 text-blue-300'
                         : 'border-app text-app-soft hover:text-app-fg'
-                    }`}
+                      }`}
                   >
                     {value[0].toUpperCase() + value.slice(1)}
                   </button>
@@ -279,22 +279,20 @@ export default function LibraryPage() {
                 <button
                   type="button"
                   onClick={() => setKindFilter('all')}
-                  className={`rounded-full border px-3 py-1 text-xs transition ${
-                    kindFilter === 'all'
+                  className={`rounded-full border px-3 py-1 text-xs transition ${kindFilter === 'all'
                       ? 'border-blue-500/45 bg-blue-500/15 text-blue-300'
                       : 'border-app text-app-soft hover:text-app-fg'
-                  }`}
+                    }`}
                 >
                   All
                 </button>
                 <button
                   type="button"
                   onClick={() => setKindFilter('ai')}
-                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition ${
-                    kindFilter === 'ai'
+                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition ${kindFilter === 'ai'
                       ? 'border-blue-500/45 bg-blue-500/15 text-blue-300'
                       : 'border-app text-app-soft hover:text-app-fg'
-                  }`}
+                    }`}
                 >
                   <Sparkles className="h-3 w-3" />
                   AI
@@ -302,11 +300,10 @@ export default function LibraryPage() {
                 <button
                   type="button"
                   onClick={() => setKindFilter('utility')}
-                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition ${
-                    kindFilter === 'utility'
+                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition ${kindFilter === 'utility'
                       ? 'border-emerald-500/45 bg-emerald-500/15 text-emerald-300'
                       : 'border-app text-app-soft hover:text-app-fg'
-                  }`}
+                    }`}
                 >
                   <Wrench className="h-3 w-3" />
                   Utility
@@ -329,11 +326,10 @@ export default function LibraryPage() {
                     key={value}
                     type="button"
                     onClick={() => setBillingFilter(value)}
-                    className={`block w-full rounded-lg border px-3 py-2 text-left text-xs transition ${
-                      billingFilter === value
+                    className={`block w-full rounded-lg border px-3 py-2 text-left text-xs transition ${billingFilter === value
                         ? 'border-blue-500/45 bg-blue-500/15 text-blue-300'
                         : 'border-app text-app-soft hover:text-app-fg'
-                    }`}
+                      }`}
                   >
                     {label}
                   </button>
@@ -368,11 +364,10 @@ export default function LibraryPage() {
                 <button
                   type="button"
                   onClick={() => setCompactView((prev) => !prev)}
-                  className={`rounded-lg border px-3 py-2 text-sm transition ${
-                    compactView
+                  className={`rounded-lg border px-3 py-2 text-sm transition ${compactView
                       ? 'border-blue-500/45 bg-blue-500/15 text-blue-300'
                       : 'border-app text-app-soft hover:text-app-fg'
-                  }`}
+                    }`}
                 >
                   {compactView ? 'Compact view' : 'Comfort view'}
                 </button>
