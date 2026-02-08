@@ -7,6 +7,7 @@ import type { BlockDefinition, BlockId } from 'shared';
 import { createCheckoutSession, getProducts } from '@/lib/api';
 import { useAppBilling } from '@/contexts/AppBillingContext';
 import { useCartStore } from '@/store/cartStore';
+import { RequireAuth } from '@/components/RequireAuth';
 
 const CHECKOUT_QUEUE_STORAGE_KEY = 'flowglad-cart-checkout-queue';
 const CHECKOUT_QUEUE_TITLES_STORAGE_KEY = 'flowglad-cart-checkout-titles';
@@ -237,29 +238,30 @@ export default function CheckoutPage() {
   }, [refreshEntitlements, startCheckout]);
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-6 md:px-6 md:py-8">
-      <h1 className="text-2xl font-semibold tracking-tight text-app-fg">Cart</h1>
-      <p className="mt-1 text-sm text-app-soft">
-        Select locked block items, then start Flowglad checkout for the selected group.
-      </p>
+    <RequireAuth>
+      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-6 md:px-6 md:py-8">
+        <h1 className="text-2xl font-semibold tracking-tight text-app-fg">Cart</h1>
+        <p className="mt-1 text-sm text-app-soft">
+          Select locked block items, then start Flowglad checkout for the selected group.
+        </p>
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs">
         {entitlementsLoading && (
           <span className="rounded-full border border-app px-3 py-1 text-app-soft">Checking entitlements…</span>
         )}
         {checkoutStatus === 'success' && (
-          <span className="rounded-full border border-emerald-500/35 bg-emerald-500/10 px-3 py-1 text-emerald-300">
+          <span className="rounded-full border border-emerald-300 dark:border-emerald-500/35 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1 text-emerald-700 dark:text-emerald-300">
             Checkout complete. Entitlements refreshed.
           </span>
         )}
         {checkoutStatus === 'cancelled' && (
-          <span className="rounded-full border border-amber-500/35 bg-amber-500/10 px-3 py-1 text-amber-300">
+          <span className="rounded-full border border-amber-300 dark:border-amber-500/35 bg-amber-50 dark:bg-amber-500/10 px-3 py-1 text-amber-700 dark:text-amber-300">
             Checkout cancelled.
           </span>
         )}
       </div>
 
-      {error && <p className="mt-4 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300">{error}</p>}
+      {error && <p className="mt-4 rounded-lg border border-rose-300 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-300">{error}</p>}
 
       {!loading && lockedItemsInCart.length > 0 && (
         <div className="mt-6 rounded-xl border border-app bg-app-surface/60 p-4">
@@ -332,12 +334,12 @@ export default function CheckoutPage() {
         {loading ? (
           <div className="rounded-xl border border-app bg-app-surface p-4 text-sm text-app-soft">Loading products…</div>
         ) : cartProducts.length === 0 ? (
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5">
-            <p className="inline-flex items-center gap-2 text-sm text-emerald-300">
+          <div className="rounded-xl border border-emerald-300 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 p-5">
+            <p className="inline-flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-300">
               <ShoppingCart className="h-4 w-4" />
               Your cart is empty.
             </p>
-            <Link href="/marketplace" className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-emerald-200 hover:text-emerald-100">
+            <Link href="/marketplace" className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-200 hover:text-emerald-600 dark:hover:text-emerald-100">
               Browse Marketplace
               <ArrowRight className="h-4 w-4" />
             </Link>
@@ -368,7 +370,7 @@ export default function CheckoutPage() {
                   <p className="text-sm text-app-soft">{block.description}</p>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
                     <span className="rounded-full border border-app px-2 py-1 text-app-soft">{block.priceSlug}</span>
-                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/35 bg-amber-500/10 px-2 py-1 text-amber-300">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 dark:border-amber-500/35 bg-amber-50 dark:bg-amber-500/10 px-2 py-1 text-amber-700 dark:text-amber-300">
                       <Lock className="h-3 w-3" /> Locked
                     </span>
                   </div>
@@ -393,11 +395,11 @@ export default function CheckoutPage() {
       </div>
 
       {!loading && unlockedItemsInCart.length > 0 && (
-        <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-          <p className="text-sm text-emerald-300">Already unlocked and removed from checkout queue:</p>
+        <div className="mt-4 rounded-xl border border-emerald-300 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 p-4">
+          <p className="text-sm text-emerald-700 dark:text-emerald-300">Already unlocked and removed from checkout queue:</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {unlockedItemsInCart.map((item) => (
-              <span key={item.id} className="inline-flex items-center gap-1 rounded-full border border-emerald-500/35 px-2 py-1 text-xs text-emerald-200">
+              <span key={item.id} className="inline-flex items-center gap-1 rounded-full border border-emerald-300 dark:border-emerald-500/35 px-2 py-1 text-xs text-emerald-700 dark:text-emerald-200">
                 <CheckCircle2 className="h-3 w-3" />
                 {item.name}
               </span>
@@ -407,35 +409,36 @@ export default function CheckoutPage() {
       )}
 
       {!loading && cartProducts.length > 0 && lockedItemsInCart.length === 0 && (
-        <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5">
-          <p className="text-sm text-emerald-300">Everything in your cart is unlocked.</p>
-          <Link href="/marketplace" className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-emerald-200 hover:text-emerald-100">
+        <div className="mt-4 rounded-xl border border-emerald-300 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 p-5">
+          <p className="text-sm text-emerald-700 dark:text-emerald-300">Everything in your cart is unlocked.</p>
+          <Link href="/marketplace" className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-200 hover:text-emerald-600 dark:hover:text-emerald-100">
             Return to Marketplace
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       )}
 
-      <div className="mt-8 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void refreshEntitlements()}
-          className="rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
-        >
-          Refresh entitlements
-        </button>
-        <button
-          type="button"
-          onClick={clearCart}
-          className="inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
-        >
-          <XCircle className="h-4 w-4" />
-          Clear cart
-        </button>
-        <Link href="/profile" className="text-sm text-blue-300 hover:text-blue-200">
-          View subscriptions and invoices
-        </Link>
+        <div className="mt-8 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => void refreshEntitlements()}
+            className="rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
+          >
+            Refresh entitlements
+          </button>
+          <button
+            type="button"
+            onClick={clearCart}
+            className="inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
+          >
+            <XCircle className="h-4 w-4" />
+            Clear cart
+          </button>
+          <Link href="/profile" className="text-sm text-blue-700 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200">
+            View subscriptions and invoices
+          </Link>
+        </div>
       </div>
-    </div>
+    </RequireAuth>
   );
 }

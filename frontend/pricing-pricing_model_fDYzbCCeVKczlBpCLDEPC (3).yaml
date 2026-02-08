@@ -1,0 +1,305 @@
+isDefault: true
+name: "[TEST] Pricing Model"
+features: []
+products:
+  - product:
+      name: Free Plan
+      description: Default plan
+      active: true
+      default: true
+      slug: free
+    price:
+      intervalUnit: null
+      name: Free Plan
+      intervalCount: null
+      type: single_payment
+      trialPeriodDays: null
+      isDefault: true
+      unitPrice: 0
+      usageEventsPerUnit: null
+      active: true
+      slug: free
+      usageMeterId: null
+    features: []
+  - product:
+      name: dummy5
+      description: ""
+      imageURL: ""
+      active: true
+      default: false
+      slug: dummy5
+    price:
+      intervalUnit: null
+      name: Default Price
+      intervalCount: null
+      type: single_payment
+      trialPeriodDays: null
+      isDefault: true
+      unitPrice: 500
+      usageEventsPerUnit: null
+      active: true
+      slug: dummy5
+      usageMeterId: null
+    features: []
+  - product:
+      name: ultra
+      description: ""
+      imageURL: ""
+      active: true
+      default: false
+      slug: ultra
+    price:
+      intervalUnit: null
+      name: Default Price
+      intervalCount: null
+      type: single_payment
+      trialPeriodDays: null
+      isDefault: true
+      unitPrice: 500
+      usageEventsPerUnit: null
+      active: true
+      slug: ultra
+      usageMeterId: null
+    features: []
+  - product:
+      name: summarize_text
+      description: ""
+      imageURL: ""
+      active: true
+      default: false
+      slug: summarize_text
+    price:
+      intervalUnit: null
+      name: Default Price
+      intervalCount: null
+      type: single_payment
+      trialPeriodDays: null
+      isDefault: true
+      unitPrice: 500
+      usageEventsPerUnit: null
+      active: true
+      slug: summarize_text
+      usageMeterId: null
+    features: []
+  - product:
+      name: extract_emails
+      description: ""
+      imageURL: ""
+      active: true
+      default: false
+      slug: extract_emails
+    price:
+      intervalUnit: null
+      name: Default Price
+      intervalCount: null
+      type: single_payment
+      trialPeriodDays: null
+      isDefault: true
+      unitPrice: 500
+      usageEventsPerUnit: null
+      active: true
+      slug: extract_emails
+      usageMeterId: null
+    features: []
+  - product:
+      name: rewrite_prompt
+      description: ""
+      imageURL: ""
+      active: true
+      default: false
+      slug: rewrite_prompt
+    price:
+      intervalUnit: null
+      name: Default Price
+      intervalCount: null
+      type: single_payment
+      trialPeriodDays: null
+      isDefault: true
+      unitPrice: 500
+      usageEventsPerUnit: null
+      active: true
+      slug: rewrite_prompt
+      usageMeterId: null
+    features: []
+  - product:
+      name: classify_input
+      description: ""
+      imageURL: ""
+      active: true
+      default: false
+      slug: classify_input
+    price:
+      intervalUnit: null
+      name: Default Price
+      intervalCount: null
+      type: single_payment
+      trialPeriodDays: null
+      isDefault: true
+      unitPrice: 500
+      usageEventsPerUnit: null
+      active: true
+      slug: classify_input
+      usageMeterId: null
+    features: []
+  - product:
+      name: merge_pdfs
+      description: ""
+      imageURL: ""
+      active: true
+      default: false
+      slug: merge_pdfs
+    price:
+      intervalUnit: null
+      name: Default Price
+      intervalCount: null
+      type: single_payment
+      trialPeriodDays: null
+      isDefault: true
+      unitPrice: 500
+      usageEventsPerUnit: null
+      active: true
+      slug: merge_pdfs
+      usageMeterId: null
+    features: []
+  - product:
+      name: Test Agent
+      description: A test agent for marketplace
+      imageURL: ""
+      active: true
+      default: false
+      slug: test_agent
+    price:
+      intervalUnit: null
+      name: Test Agent Price
+      intervalCount: null
+      type: single_payment
+      trialPeriodDays: null
+      isDefault: true
+      unitPrice: 999
+      usageEventsPerUnit: null
+      active: true
+      slug: test_agent
+      usageMeterId: null
+    features: []
+  - product:
+      name: gooner
+      description: goons
+      imageURL: ""
+      active: true
+      default: false
+      slug: gooner
+    price:
+      intervalUnit: null
+      name: gooner Price
+      intervalCount: null
+      type: single_payment
+      trialPeriodDays: null
+      isDefault: true
+      unitPrice: 500
+      usageEventsPerUnit: null
+      active: true
+      slug: gooner
+      usageMeterId: null
+    features: []
+  - product:
+      name: goon2
+      description: goons
+      imageURL: ""
+      active: true
+      default: false
+      slug: goon2
+    price:
+      intervalUnit: null
+      name: goon2 Price
+      intervalCount: null
+      type: single_payment
+      trialPeriodDays: null
+      isDefault: true
+      unitPrice: 500
+      usageEventsPerUnit: null
+      active: true
+      slug: goon2
+      usageMeterId: null
+    features: []
+  - product:
+      name: Starter Pack
+      description: ""
+      imageURL: ""
+      active: true
+      default: false
+      slug: starter_pack
+    price:
+      intervalUnit: null
+      name: Default Price
+      intervalCount: null
+      type: single_payment
+      trialPeriodDays: null
+      isDefault: true
+      unitPrice: 500
+      usageEventsPerUnit: null
+      active: true
+      slug: starter_pack
+      usageMeterId: null
+    features: []
+  - product:
+      name: Pro Pack
+      description: ""
+      imageURL: ""
+      active: true
+      default: false
+      slug: pro_pack
+    price:
+      intervalUnit: null
+      name: Default Price
+      intervalCount: null
+      type: single_payment
+      trialPeriodDays: null
+      isDefault: true
+      unitPrice: 2000
+      usageEventsPerUnit: null
+      active: true
+      slug: pro_pack
+      usageMeterId: null
+    features: []
+  - product:
+      name: Monthly Plan
+      description: ""
+      imageURL: ""
+      active: true
+      default: false
+      slug: monthly_plan
+    price:
+      intervalUnit: month
+      name: Default Price
+      intervalCount: 1
+      type: subscription
+      trialPeriodDays: 0
+      isDefault: true
+      unitPrice: 1000
+      usageEventsPerUnit: null
+      active: true
+      slug: monthly_plan
+      usageMeterId: null
+    features: []
+  - product:
+      name: Weekly Plan
+      description: ""
+      imageURL: ""
+      active: true
+      default: false
+      slug: weekly_plan
+    price:
+      intervalUnit: week
+      name: Default Price
+      intervalCount: 1
+      type: subscription
+      trialPeriodDays: 0
+      isDefault: true
+      unitPrice: 300
+      usageEventsPerUnit: null
+      active: true
+      slug: weekly_plan
+      usageMeterId: null
+    features: []
+usageMeters: []
+resources: []

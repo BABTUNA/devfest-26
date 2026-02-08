@@ -9,6 +9,9 @@ import { productsRouter } from './routes/products.js';
 import { entitlementsRouter } from './routes/entitlements.js';
 import { checkoutRouter } from './routes/checkout.js';
 import { webhookRouter } from './routes/webhook.js';
+import { authRouter } from './routes/auth.js';
+import { usersRouter } from './routes/users.js';
+import { workflowsRouter } from './routes/workflows.js';
 import { tokensRouter } from './routes/tokens.js';
 
 const app = express();
@@ -22,6 +25,8 @@ console.log('DEMO_MODE:', DEMO_MODE);
 console.log('FLOWGLAD_SECRET_KEY set:', !!FLOWGLAD_SECRET_KEY);
 console.log('FLOWGLAD_SECRET_KEY length:', FLOWGLAD_SECRET_KEY?.length ?? 0);
 console.log('FLOWGLAD_SECRET_KEY prefix:', FLOWGLAD_SECRET_KEY ? `${FLOWGLAD_SECRET_KEY.substring(0, 10)}...` : 'not set');
+console.log('SUPABASE_URL set:', !!process.env.SUPABASE_URL);
+console.log('SUPABASE_SERVICE_ROLE_KEY set:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
 if (!DEMO_MODE && !FLOWGLAD_SECRET_KEY) {
   console.warn('[Config] FLOWGLAD_SECRET_KEY missing and DEMO_MODE is false. Billing endpoints will fail until key is provided.');
 }
@@ -35,6 +40,11 @@ app.use((req, res, next) => {
   console.log(`[Request] ${req.method} ${req.path}`);
   next();
 });
+
+// Supabase routes (auth, users, workflows)
+app.use('/api/auth', authRouter);
+app.use('/api/users', usersRouter);
+app.use('/api/workflows', workflowsRouter);
 
 // Flowglad: mount at /api/flowglad so frontend useBilling() can talk to it
 if (!DEMO_MODE) {

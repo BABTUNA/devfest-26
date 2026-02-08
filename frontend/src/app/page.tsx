@@ -6,7 +6,7 @@ export default function HomePage() {
     <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-10 md:px-6 md:py-14">
       <section className="grid gap-6 rounded-2xl border border-app bg-app-surface/70 p-6 shadow-xl backdrop-blur md:grid-cols-[1.3fr_1fr] md:p-8">
         <div>
-          <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-500/40 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-300">
+          <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-300 dark:border-blue-500/40 bg-blue-50 dark:bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-700 dark:text-blue-300">
             <Sparkles className="h-3.5 w-3.5" />
             Entitlement-driven AI tools
           </p>

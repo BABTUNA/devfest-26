@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { flowglad } from '../lib/flowglad.js';
-import { getCustomerExternalId } from '../lib/auth.js';
+import { getCustomerExternalId, requireAuth } from '../lib/auth.js';
 import { BLOCK_DEFINITIONS } from 'shared';
 
 export const checkoutRouter = Router();
@@ -20,7 +20,7 @@ export function grantDemoEntitlement(userId: string, featureSlug: string): void 
   getDemoEntitlements(userId).add(featureSlug);
 }
 
-checkoutRouter.post('/', async (req, res) => {
+checkoutRouter.post('/', requireAuth, async (req, res) => {
   try {
     const userId = await getCustomerExternalId(req);
     const { priceSlug, priceSlugs, successUrl, cancelUrl, outputName, outputMetadata } = req.body as {

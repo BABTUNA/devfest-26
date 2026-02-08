@@ -58,11 +58,11 @@ function BlockNodeComponent({
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-app bg-app-card px-3 py-2">
         <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-app bg-app-surface">
-          <Icon className="h-3.5 w-3.5 text-blue-300" />
+          <Icon className="h-3.5 w-3.5 text-blue-700 dark:text-blue-300" />
         </span>
         <span className="flex-1 truncate text-sm font-medium text-app-fg">{data.label}</span>
         {hasCachedOutput && (
-          <span className="flex shrink-0 items-center gap-0.5 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-300" title="Has cached output">
+          <span className="flex shrink-0 items-center gap-0.5 rounded bg-emerald-100 dark:bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:text-emerald-300" title="Has cached output">
             <Check className="h-3 w-3" />
             out
           </span>

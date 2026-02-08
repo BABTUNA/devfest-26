@@ -60,7 +60,7 @@ export function ExecutionLogPanel() {
               key={entry.id}
               className={`rounded-lg border p-2 ${entry.success
                 ? 'border-app bg-app-card/80'
-                : 'border-rose-500/30 bg-rose-500/10'
+                : 'border-rose-300 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10'
                 }`}
             >
               <div className="flex items-center justify-between gap-2">
@@ -70,7 +70,7 @@ export function ExecutionLogPanel() {
                 </span>
               </div>
               {entry.error && (
-                <p className="mt-1 text-rose-300">{entry.error}</p>
+                <p className="mt-1 text-rose-700 dark:text-rose-300">{entry.error}</p>
               )}
               {entry.success && entry.output != null && Object.keys(entry.output).length > 0 && (
                 <pre className="mt-1 overflow-auto rounded bg-app p-2 text-app-soft max-h-32">

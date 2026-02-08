@@ -54,7 +54,7 @@ export function FlowContextMenu({
           }}
           className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition ${
             item.danger
-              ? 'text-rose-400 hover:bg-rose-500/10'
+              ? 'text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10'
               : 'text-app-fg hover:bg-app-card'
           }`}
         >

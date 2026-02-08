@@ -176,9 +176,9 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-rose-500/30 bg-app-surface p-6">
+        <section className="rounded-xl border border-rose-300 dark:border-rose-500/30 bg-app-surface p-6">
           <h2 className="flex items-center gap-2 text-base font-semibold text-app-fg">
-            <Trash2 className="h-5 w-5 text-rose-400" />
+            <Trash2 className="h-5 w-5 text-rose-600 dark:text-rose-400" />
             Danger Zone
           </h2>
           <p className="mt-1 text-sm text-app-soft">
@@ -192,7 +192,7 @@ export default function SettingsPage() {
             <button
               type="button"
               disabled
-              className="mt-3 cursor-not-allowed rounded-lg border border-rose-500/50 px-4 py-2 text-sm font-medium text-rose-400 opacity-50 transition hover:bg-rose-500/10"
+              className="mt-3 cursor-not-allowed rounded-lg border border-rose-400 dark:border-rose-500/50 px-4 py-2 text-sm font-medium text-rose-600 dark:text-rose-400 opacity-50 transition hover:bg-rose-50 dark:hover:bg-rose-500/10"
             >
               Delete Account
             </button>

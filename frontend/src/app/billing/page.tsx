@@ -60,7 +60,7 @@ export default function BillingPage() {
               href={billingPortalUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-2 inline-flex items-center gap-1 text-sm text-blue-300 hover:text-blue-200"
+              className="mt-2 inline-flex items-center gap-1 text-sm text-blue-700 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200"
             >
               Open portal
               <ExternalLink className="h-3.5 w-3.5" />
@@ -96,8 +96,8 @@ export default function BillingPage() {
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                         sub.status === 'active'
-                          ? 'bg-emerald-500/20 text-emerald-300'
-                          : 'bg-blue-500/20 text-blue-300'
+                          ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                          : 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300'
                       }`}
                     >
                       {sub.status}
@@ -153,7 +153,7 @@ export default function BillingPage() {
                         href={link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-sm text-blue-300 hover:text-blue-200"
+                        className="inline-flex items-center gap-1 text-sm text-blue-700 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200"
                       >
                         View
                         <ExternalLink className="h-3.5 w-3.5" />

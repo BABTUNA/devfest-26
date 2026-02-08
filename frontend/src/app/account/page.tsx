@@ -65,7 +65,7 @@ export default function AccountPage() {
           </p>
           <button
             onClick={() => void refreshEntitlements()}
-            className="mt-3 text-xs text-blue-300 hover:text-blue-200"
+              className="mt-3 text-xs text-blue-700 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200"
           >
             {entitlementsLoading ? 'Refreshing\u2026' : 'Refresh entitlements'}
           </button>
@@ -99,7 +99,7 @@ export default function AccountPage() {
                   {count} local run{count === 1 ? '' : 's'}
                 </p>
                 <p
-                  className={`mt-1 text-xs ${unlocked ? 'text-emerald-300' : 'text-amber-300'}`}
+                  className={`mt-1 text-xs ${unlocked ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'}`}
                 >
                   {unlocked ? 'Unlocked' : 'Locked'}
                 </p>

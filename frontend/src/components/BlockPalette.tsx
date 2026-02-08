@@ -106,16 +106,16 @@ function CategorySection({
                 className={`group cursor-grab rounded-xl border px-3 py-2.5 transition active:cursor-grabbing ${
                   hasAccess
                     ? 'border-app bg-app-surface text-app-fg hover:border-blue-500/60 hover:bg-app-surface'
-                    : 'border-amber-500/35 bg-amber-500/10 text-app-fg hover:border-amber-500/60'
+                    : 'border-amber-300 dark:border-amber-500/35 bg-amber-50 dark:bg-amber-500/10 text-app-fg hover:border-amber-400 dark:hover:border-amber-500/60'
                 }`}
                 title={hasAccess ? block.description : 'Locked block: unlock in Marketplace or from Run panel'}
               >
                 <div className="flex items-center gap-2">
                   <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-app bg-app-card">
-                    <Icon className={`h-3.5 w-3.5 ${hasAccess ? 'text-blue-300 group-hover:text-blue-200' : 'text-amber-300'}`} />
+                    <Icon className={`h-3.5 w-3.5 ${hasAccess ? 'text-blue-700 dark:text-blue-300 group-hover:text-blue-600 dark:group-hover:text-blue-200' : 'text-amber-700 dark:text-amber-300'}`} />
                   </span>
                   <span className="truncate text-sm font-medium">{block.name}</span>
-                  {!hasAccess && <Lock className="ml-auto h-3.5 w-3.5 shrink-0 text-amber-300" />}
+                  {!hasAccess && <Lock className="ml-auto h-3.5 w-3.5 shrink-0 text-amber-700 dark:text-amber-300" />}
                 </div>
                 <p className="mt-1 truncate text-[11px] text-app-soft">{block.description}</p>
               </div>
