@@ -2,7 +2,7 @@
 
 import { memo } from 'react';
 import { Handle, type Node, type NodeProps, Position } from '@xyflow/react';
-import { Brain, Mail, PenLine, TestTube, FileStack, Play, Layers, Type, GitBranch, Check } from 'lucide-react';
+import { Brain, Mail, PenLine, TestTube, FileStack, Play, Layers, Type, GitBranch, Check, Languages, Volume2, Mic, MessageSquare, Hash, Globe2 } from 'lucide-react';
 import { getBlockById, type BlockId } from 'shared';
 import { useFlowRunStore } from '@/store/flowRunStore';
 
@@ -16,6 +16,12 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Layers,
   Type,
   GitBranch,
+  Languages,
+  Volume2,
+  Mic,
+  MessageSquare,
+  Hash,
+  Globe2,
 };
 
 /** Mock output type for display when not in schema */

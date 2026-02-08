@@ -7,7 +7,13 @@ export type BlockId =
   | 'trigger'
   | 'text-join'
   | 'constant'
-  | 'conditional';
+  | 'conditional'
+  | 'translate-text'
+  | 'text-to-speech'
+  | 'speech-to-text'
+  | 'send-slack'
+  | 'send-discord'
+  | 'fetch-url';
 
 export interface BlockDefinition {
   id: BlockId;
@@ -152,6 +158,99 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
       { key: 'pattern', label: 'Contains (optional)', type: 'text', required: false },
     ],
     outputs: [{ key: 'match', label: 'Match result' }],
+  },
+  // --- New blocks ---
+  {
+    id: 'translate-text',
+    name: 'Translate Text',
+    description: 'Enter text + target language → get the translated version.',
+    icon: 'Languages',
+    featureSlug: 'translate_text',
+    priceSlug: 'translate_text',
+    checkoutPriceSlugs: ['translate_text_usage'],
+    usageMeterSlug: 'translate_text_runs',
+    usesAI: true,
+    inputs: [
+      { key: 'text', label: 'Text to translate', type: 'text', required: true },
+      { key: 'targetLanguage', label: 'Target language (e.g. Spanish, French)', type: 'text', required: true },
+    ],
+    outputs: [{ key: 'translated', label: 'Translated text' }],
+  },
+  {
+    id: 'text-to-speech',
+    name: 'Text to Speech',
+    description: 'Enter text → get an audio file of the spoken words.',
+    icon: 'Volume2',
+    featureSlug: 'text_to_speech',
+    priceSlug: 'text_to_speech',
+    checkoutPriceSlugs: ['text_to_speech_usage'],
+    usageMeterSlug: 'text_to_speech_runs',
+    usesAI: true,
+    inputs: [
+      { key: 'text', label: 'Text to speak', type: 'text', required: true },
+      { key: 'voiceId', label: 'ElevenLabs Voice ID (optional)', type: 'text', required: false },
+    ],
+    outputs: [{ key: 'audioBase64', label: 'Audio file (base64)' }],
+  },
+  {
+    id: 'speech-to-text',
+    name: 'Speech to Text',
+    description: 'Upload audio → get a text transcription of the spoken words.',
+    icon: 'Mic',
+    featureSlug: 'speech_to_text',
+    priceSlug: 'speech_to_text',
+    checkoutPriceSlugs: ['speech_to_text_usage'],
+    usageMeterSlug: 'speech_to_text_runs',
+    usesAI: true,
+    inputs: [
+      { key: 'audioBase64', label: 'Audio file (base64)', type: 'text', required: true },
+      { key: 'language', label: 'Language code (e.g. en, es)', type: 'text', required: false },
+    ],
+    outputs: [{ key: 'transcription', label: 'Transcribed text' }],
+  },
+  {
+    id: 'send-slack',
+    name: 'Send to Slack',
+    description: 'Enter a message + Slack webhook URL → message gets posted to your Slack channel.',
+    icon: 'MessageSquare',
+    featureSlug: 'free',
+    priceSlug: 'free',
+    usesAI: false,
+    inputs: [
+      { key: 'webhookUrl', label: 'Slack Webhook URL', type: 'text', required: true },
+      { key: 'message', label: 'Message to send', type: 'text', required: true },
+    ],
+    outputs: [{ key: 'status', label: 'Send status' }],
+  },
+  {
+    id: 'send-discord',
+    name: 'Send to Discord',
+    description: 'Enter a message + Discord webhook URL → message gets posted to your Discord channel.',
+    icon: 'Hash',
+    featureSlug: 'free',
+    priceSlug: 'free',
+    usesAI: false,
+    inputs: [
+      { key: 'webhookUrl', label: 'Discord Webhook URL', type: 'text', required: true },
+      { key: 'message', label: 'Message to send', type: 'text', required: true },
+    ],
+    outputs: [{ key: 'status', label: 'Send status' }],
+  },
+  {
+    id: 'fetch-url',
+    name: 'Fetch URL',
+    description: 'Enter a URL → get the webpage content as text.',
+    icon: 'Globe2',
+    featureSlug: 'free',
+    priceSlug: 'free',
+    usesAI: false,
+    inputs: [
+      { key: 'url', label: 'URL to fetch', type: 'text', required: true },
+    ],
+    outputs: [
+      { key: 'body', label: 'Page content' },
+      { key: 'statusCode', label: 'HTTP status code' },
+    ],
   },
 ];
 
