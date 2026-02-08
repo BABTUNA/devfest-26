@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ArrowUpRight,
   BadgeDollarSign,
@@ -129,6 +129,21 @@ export default function AnalyticsPage() {
 
   const maxRevenuePoint = Math.max(...revenueSeries.map((item) => item.value), 1);
 
+  const [revealedCount, setRevealedCount] = useState(0);
+
+  const CAMPAIGNS = [
+    { code: 'SUMMARIZE25', label: 'Summarize Power User', discount: '25% OFF', redemptions: 142, revenue: 4250 },
+    { code: 'EMAILS25', label: 'Email Extractor Deal', discount: '25% OFF', redemptions: 89, revenue: 1850 },
+    { code: 'REWRITE25', label: 'Prompt Engineering', discount: '25% OFF', redemptions: 64, revenue: 2100 },
+    { code: 'CLASSIFY25', label: 'Classifier Pro', discount: '25% OFF', redemptions: 41, revenue: 980 },
+  ];
+
+  const handleGenerate = () => {
+    if (revealedCount < CAMPAIGNS.length) {
+      setRevealedCount((prev) => prev + 1);
+    }
+  };
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-6 md:px-6 md:py-8">
       <div className="rounded-2xl border border-app bg-app-surface/75 p-5 md:p-6">
@@ -225,6 +240,37 @@ export default function AnalyticsPage() {
       </section>
 
       <section className="mt-5 rounded-xl border border-app bg-app-surface p-4 md:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-app-soft">Active Campaigns</h2>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-app-soft hidden sm:block">Live Discount Codes</span>
+            {revealedCount < CAMPAIGNS.length && (
+              <button
+                onClick={handleGenerate}
+                className="rounded-md bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 active:translate-y-px transition-all border border-emerald-500/20"
+              >
+                + Generate Coupon
+              </button>
+            )}
+          </div>
+        </div>
+
+        {revealedCount === 0 ? (
+          <div className="mt-6 flex flex-col items-center gap-2 py-8 text-center border border-dashed border-app/30 rounded-lg">
+            <BadgeDollarSign className="h-6 w-6 text-app-soft/40" />
+            <p className="text-sm text-app-soft">No active campaigns generated.</p>
+            <p className="text-xs text-app-soft/60">Click Generate to create a new discount code.</p>
+          </div>
+        ) : (
+          <div className="mt-3 grid gap-3 lg:grid-cols-4 animate-in fade-in duration-500">
+            {CAMPAIGNS.slice(0, revealedCount).map((campaign) => (
+              <CampaignCard key={campaign.code} {...campaign} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-5 rounded-xl border border-app bg-app-surface p-4 md:p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-app-soft">Recommended Actions</h2>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           <InsightCard
@@ -238,6 +284,42 @@ export default function AnalyticsPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+function CampaignCard({
+  code,
+  label,
+  discount,
+  redemptions,
+  revenue,
+}: {
+  code: string;
+  label: string;
+  discount: string;
+  redemptions: number;
+  revenue: number;
+}) {
+  return (
+    <article className="rounded-lg border border-app bg-app/45 p-3">
+      <div className="flex items-center justify-between">
+        <p className="font-mono text-sm font-bold text-emerald-400">{code}</p>
+        <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">
+          {discount}
+        </span>
+      </div>
+      <p className="mt-1 text-xs text-app-soft">{label}</p>
+      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-app/50 pt-2 text-xs">
+        <div>
+          <p className="text-app-soft">Redeemed</p>
+          <p className="font-medium text-app-fg">{redemptions}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-app-soft">Revenue</p>
+          <p className="font-medium text-app-fg">{formatUSD(revenue * 100)}</p>
+        </div>
+      </div>
+    </article>
   );
 }
 

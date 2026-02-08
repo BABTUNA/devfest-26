@@ -22,16 +22,17 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
+  Home,
   ScrollText,
   Play,
   WandSparkles,
   LayoutGrid,
   Trash2,
   PackagePlus,
-  Info,
 } from 'lucide-react';
 import { BlockNode, type BlockFlowNode, type BlockNodeData } from '@/components/BlockNode';
 import { BlockPalette } from '@/components/BlockPalette';
+import { BlockConfigModal } from '@/components/BlockConfigModal';
 import { RunBlockPanel } from '@/components/RunBlockPanel';
 import { ExecutionLogPanel } from '@/components/ExecutionLogPanel';
 import {
@@ -41,14 +42,11 @@ import {
 } from '@/components/FlowContextMenu';
 import type { BlockDefinition } from 'shared';
 import { getBlockById } from 'shared';
-import { topologicalOrder, getEntryInputs, getInputSource } from '@/lib/workflowLogic';
-import { EntryInputsModal, type EntryInputField } from '@/components/EntryInputsModal';
+import { topologicalOrder, getConnectedNodeIds, getInputSource } from '@/lib/workflowLogic';
 import { useFlowRunStore } from '@/store/flowRunStore';
 import { useExecutionLog } from '@/store/executionLog';
 import { useTheme } from '@/contexts/ThemeContext';
 import { CreateProductModal } from '@/components/CreateProductModal';
-import { RequireAuth } from '@/components/RequireAuth';
-import { runBlock as runBlockApi } from '@/lib/api';
 
 type FlowNode = BlockFlowNode;
 type FlowEdge = Edge;
@@ -295,28 +293,16 @@ function FlowCanvas({
       >
         <Background color={minorGrid} gap={16} size={1.5} />
         <Background color={majorGrid} gap={80} size={2} />
-        <Controls className="!border-app !bg-app-surface !text-app-soft" showInteractive={false} />
+        <Controls className="!border-app !bg-app-surface !text-app-soft" />
         <MiniMap
           nodeColor={lineColor}
           maskColor={isDark ? 'rgba(2,6,23,0.78)' : 'rgba(226,232,240,0.72)'}
           className="!border-app !bg-app-surface"
         />
-        <Panel position="top-right" className="flex items-center gap-2">
-          <span className="rounded-full border border-app bg-app-surface px-2.5 py-1 text-xs text-app-soft shadow-sm backdrop-blur">
-            {nodes.length} block{nodes.length !== 1 ? 's' : ''}
+        <Panel position="top-center" className="rounded-full border border-app bg-app-surface px-3 py-1.5 shadow-sm backdrop-blur">
+          <span className="text-app-soft text-xs">
+            Drag to add blocks, connect outputs to inputs, double-click to configure, right-click to run
           </span>
-          <div className="group relative">
-            <button
-              type="button"
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-app bg-app-surface text-app-soft shadow-sm backdrop-blur transition hover:text-app-fg"
-              aria-label="Canvas help"
-            >
-              <Info className="h-4 w-4" />
-            </button>
-            <div className="pointer-events-none absolute right-0 top-full z-50 mt-2 w-56 rounded-lg border border-app bg-app-surface px-3 py-2 text-xs text-app-soft shadow-lg opacity-0 transition-opacity group-hover:opacity-100">
-              Drag to add blocks, connect outputs to inputs, double-click nodes to run
-            </div>
-          </div>
         </Panel>
         {nodes.length === 0 && (
           <Panel position="top-left" className="mt-20 ml-8 max-w-sm">
@@ -352,7 +338,7 @@ export default function DashboardPage() {
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const [runPanelNode, setRunPanelNode] = useState<RunPanelState>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
-  const [entryModalFields, setEntryModalFields] = useState<EntryInputField[] | null>(null);
+  const [configModalNode, setConfigModalNode] = useState<FlowNode | null>(null);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
   const [workflowRunning, setWorkflowRunning] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -426,13 +412,21 @@ export default function DashboardPage() {
   const runWorkflowWithEntryValues = useCallback(
     async (entryValues: Record<string, Record<string, string>>) => {
       setWorkflowError(null);
-      setEntryModalFields(null);
-      const order = topologicalOrder(nodes, edges);
+      const connectedIds = getConnectedNodeIds(nodes, edges);
+      const connectedNodes = nodes.filter((n) => connectedIds.has(n.id));
+      const order = topologicalOrder(connectedNodes, edges);
       if (!order || order.length === 0) {
-        setWorkflowError(order === null ? 'Workflow has a cycle.' : 'No nodes to run.');
+        setWorkflowError(
+          order === null
+            ? 'Workflow has a cycle.'
+            : connectedIds.size === 0
+              ? 'Connect blocks with edges to run. Only connected nodes are executed.'
+              : 'No nodes to run.'
+        );
         return;
       }
       setWorkflowRunning(true);
+      const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
       try {
         for (const nodeId of order) {
           const node = nodes.find((n) => n.id === nodeId);
@@ -446,10 +440,28 @@ export default function DashboardPage() {
               const v = getOutput(src.sourceNodeId, src.sourceHandle);
               inputs[input.key] = v != null ? String(v) : '';
             } else {
-              inputs[input.key] = entryValues[nodeId]?.[input.key] ?? '';
+              const configVal = (node.data as BlockNodeData).config?.[input.key];
+              inputs[input.key] =
+                entryValues[nodeId]?.[input.key] ??
+                (configVal != null ? String(configVal) : '');
             }
           }
-          const json = await runBlockApi({ blockId: block.id, inputs });
+          const res = await fetch(`${API_URL}/api/run-block`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-User-Id': 'demo-user-1' },
+            body: JSON.stringify({ blockId: block.id, inputs }),
+          });
+          let json: { message?: string; error?: string; outputs?: Record<string, unknown> };
+          try {
+            json = await res.json();
+          } catch {
+            json = { error: `Server error ${res.status}` };
+          }
+          if (!res.ok) {
+            const errorMsg = json.message || json.error || `Failed at ${node.data?.label ?? nodeId}`;
+            setWorkflowError(errorMsg);
+            return;
+          }
           setNodeOutput(nodeId, json.outputs ?? {});
         }
       } catch (e) {
@@ -463,21 +475,21 @@ export default function DashboardPage() {
 
   const handleRunWorkflow = useCallback(() => {
     setWorkflowError(null);
-    const order = topologicalOrder(nodes, edges);
+    const connectedIds = getConnectedNodeIds(nodes, edges);
+    const connectedNodes = nodes.filter((n) => connectedIds.has(n.id));
+    const order = topologicalOrder(connectedNodes, edges);
     if (!order || order.length === 0) {
-      setWorkflowError(order === null ? 'Workflow has a cycle.' : 'Add blocks to run.');
+      setWorkflowError(
+        order === null
+          ? 'Workflow has a cycle.'
+          : connectedIds.size === 0
+            ? 'Connect blocks with edges to run. Only connected nodes are executed.'
+            : 'Add blocks to run.'
+      );
       return;
     }
-    const entryFields = getEntryInputs(nodes, edges, (nodeId) => {
-      const node = nodes.find((n) => n.id === nodeId);
-      const block = getBlockById(node?.data?.blockId as import('shared').BlockId);
-      return (block?.inputs ?? []).map((i) => ({ key: i.key, label: i.label }));
-    });
-    if (entryFields.length > 0) {
-      setEntryModalFields(entryFields);
-    } else {
-      runWorkflowWithEntryValues({});
-    }
+    // Run workflow directly - use config values and connected inputs, empty strings for missing values
+    runWorkflowWithEntryValues({});
   }, [nodes, edges, runWorkflowWithEntryValues]);
 
   const addBlockAt = useCallback(
@@ -561,8 +573,8 @@ export default function DashboardPage() {
     }
     const remaining = nodes.filter((n) => !assigned.has(n.id)).map((n) => n.id);
     if (remaining.length > 0) layers.push(remaining);
-    const padX = 300;
-    const padY = 160;
+    const padX = 220;
+    const padY = 100;
     setNodes((prev) =>
       prev.map((node) => {
         let layerIndex = -1;
@@ -584,9 +596,8 @@ export default function DashboardPage() {
   }, [nodes, edges, setNodes]);
 
   return (
-    <RequireAuth>
-    <div className="mx-auto flex h-[calc(100vh-64px)] w-full max-w-7xl flex-col px-4 py-6 md:px-6 md:py-8">
-      <div className="mb-3 rounded-2xl border border-app bg-app-surface/75 p-4 md:p-5">
+    <div className="mx-auto flex w-full max-w-7xl flex-1 min-h-0 flex-col px-4 py-6 md:px-6 md:py-8">
+      <div className="mb-5 rounded-2xl border border-app bg-app-surface/75 p-4 md:p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-app-fg">Lab</h1>
@@ -594,120 +605,103 @@ export default function DashboardPage() {
               Build block-based workflows, run them end-to-end, and inspect outputs as you iterate.
             </p>
           </div>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
+          >
+            <Home className="h-4 w-4" />
+            Home
+          </Link>
         </div>
-      </div>
 
-      <div className="mb-5 rounded-2xl border border-app bg-app-surface/75 px-4 py-3 md:px-5">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* ── Primary actions ── */}
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={handleRunWorkflow}
-              disabled={nodes.length === 0 || workflowRunning}
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-emerald-600/25 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
-            >
-              <Play className="h-4 w-4" />
-              {workflowRunning ? 'Running…' : 'Run workflow'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowCreateProductModal(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-blue-500/30 bg-blue-600/10 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 transition hover:bg-blue-600/20"
-            >
-              <PackagePlus className="h-4 w-4" />
-              Create Agent
-            </button>
-          </div>
-
-          <div className="h-5 w-px bg-app-border/40" aria-hidden="true" />
-
-          {/* ── Canvas tools ── */}
-          <div className="inline-flex items-center rounded-lg border border-app bg-app-surface/50">
-            <button
-              type="button"
-              onClick={handleRunSelected}
-              disabled={selectedNodeIds.length !== 1}
-              className="inline-flex items-center gap-1.5 rounded-l-lg px-2.5 py-1.5 text-xs font-medium text-app-soft transition hover:bg-app-surface hover:text-app-fg disabled:opacity-35"
-              title="Run selected block"
-            >
-              <WandSparkles className="h-3.5 w-3.5" />
-              Run selected
-            </button>
-            <div className="h-4 w-px bg-app-border/40" aria-hidden="true" />
-            <button
-              type="button"
-              onClick={handleAutoLayout}
-              disabled={nodes.length === 0}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-app-soft transition hover:bg-app-surface hover:text-app-fg disabled:opacity-35"
-              title="Auto-layout nodes"
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Layout
-            </button>
-            <div className="h-4 w-px bg-app-border/40" aria-hidden="true" />
-            <button
-              type="button"
-              onClick={handlePrepopulate}
-              className="inline-flex items-center gap-1.5 rounded-r-lg px-2.5 py-1.5 text-xs font-medium text-amber-600 dark:text-amber-400 transition hover:bg-amber-500/10"
-              title="Load Constant → Summarize test flow"
-            >
-              Prepopulate
-            </button>
-          </div>
-
-          <div className="h-5 w-px bg-app-border/40" aria-hidden="true" />
-
-          {/* ── Data & visibility ── */}
-          <div className="inline-flex items-center rounded-lg border border-app bg-app-surface/50">
-            <button
-              type="button"
-              onClick={() => setVisible(!isVisible)}
-              className={`inline-flex items-center gap-1.5 rounded-l-lg px-2.5 py-1.5 text-xs font-medium transition ${isVisible
-                ? 'bg-blue-100 dark:bg-blue-600/15 text-blue-700 dark:text-blue-300'
-                : 'text-app-soft hover:bg-app-surface hover:text-app-fg'
-                }`}
-            >
-              <ScrollText className="h-3.5 w-3.5" />
-              Logs
-            </button>
-            <div className="h-4 w-px bg-app-border/40" aria-hidden="true" />
-            <button
-              type="button"
-              onClick={handleImport}
-              className="px-2.5 py-1.5 text-xs font-medium text-app-soft transition hover:bg-app-surface hover:text-app-fg"
-            >
-              Import
-            </button>
-            <div className="h-4 w-px bg-app-border/40" aria-hidden="true" />
-            <button
-              type="button"
-              onClick={handleExport}
-              className="rounded-r-lg px-2.5 py-1.5 text-xs font-medium text-app-soft transition hover:bg-app-surface hover:text-app-fg"
-            >
-              Export
-            </button>
-          </div>
-
-          {/* ── Destructive / reset (pushed right) ── */}
-          <div className="ml-auto inline-flex items-center gap-1">
-            <button
-              type="button"
-              onClick={clearRunCache}
-              className="rounded-md px-2 py-1.5 text-xs text-app-soft/70 transition hover:bg-app-surface hover:text-app-fg"
-              title="Clear cached outputs"
-            >
-              Clear Cache
-            </button>
-            <button
-              type="button"
-              onClick={handleClearCanvas}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-app-soft/70 transition hover:bg-rose-500/10 hover:text-rose-400"
-            >
-              <Trash2 className="h-3 w-3" />
-              Clear
-            </button>
-          </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleRunWorkflow}
+            disabled={nodes.length === 0 || workflowRunning}
+            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Play className="h-4 w-4" />
+            {workflowRunning ? 'Running…' : 'Run workflow'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowCreateProductModal(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-500"
+          >
+            <PackagePlus className="h-4 w-4" />
+            Create Agent
+          </button>
+          <button
+            type="button"
+            onClick={handleRunSelected}
+            disabled={selectedNodeIds.length !== 1}
+            className="inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg disabled:opacity-40"
+          >
+            <WandSparkles className="h-4 w-4" />
+            Run selected
+          </button>
+          <button
+            type="button"
+            onClick={handleAutoLayout}
+            disabled={nodes.length === 0}
+            className="inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg disabled:opacity-40"
+          >
+            <LayoutGrid className="h-4 w-4" />
+            Auto-layout
+          </button>
+          <button
+            type="button"
+            onClick={handlePrepopulate}
+            className="rounded-lg border border-amber-300 dark:border-amber-500/35 bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-700 dark:text-amber-300 transition hover:bg-amber-100 dark:hover:bg-amber-500/20"
+            title="Load Constant → Summarize test flow"
+          >
+            Prepopulate
+          </button>
+          <button
+            type="button"
+            onClick={() => setVisible(!isVisible)}
+            className={`inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm transition ${isVisible
+              ? 'bg-blue-100 dark:bg-blue-600/15 text-blue-700 dark:text-blue-300'
+              : 'text-app-soft hover:bg-app-surface hover:text-app-fg'
+              }`}
+          >
+            <ScrollText className="h-4 w-4" />
+            Logs
+          </button>
+          <button
+            type="button"
+            onClick={handleImport}
+            className="rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
+          >
+            Import
+          </button>
+          <button
+            type="button"
+            onClick={handleExport}
+            className="rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
+          >
+            Export
+          </button>
+          <button
+            type="button"
+            onClick={clearRunCache}
+            className="rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
+            title="Clear cached outputs"
+          >
+            Clear cache
+          </button>
+          <button
+            type="button"
+            onClick={handleClearCanvas}
+            className="inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-rose-300"
+          >
+            <Trash2 className="h-4 w-4" />
+            Clear canvas
+          </button>
+          <span className="ml-auto rounded-full border border-app px-2.5 py-1 text-xs text-app-soft">
+            {nodes.length} block{nodes.length !== 1 ? 's' : ''}
+          </span>
         </div>
         {workflowError && (
           <p className="mt-3 rounded-lg border border-rose-300 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 px-3 py-2 text-sm text-rose-700 dark:text-rose-300">
@@ -717,9 +711,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[260px_1fr]">
-        <div className="min-h-0 overflow-hidden">
-          <BlockPalette onAddBlock={addBlockAt} />
-        </div>
+        <BlockPalette onAddBlock={addBlockAt} />
         <div className="flex min-h-0 overflow-hidden rounded-2xl border border-app bg-app-surface/70">
           <div className="min-h-0 flex-1">
             <ReactFlowProvider>
@@ -739,16 +731,7 @@ export default function DashboardPage() {
                 removeNodes={removeNodes}
                 theme={resolvedTheme}
                 onNodeDoubleClick={(e, node) => {
-                  if (node.data) {
-                    setRunPanelNode({
-                      id: node.id,
-                      data: {
-                        blockId: String(node.data.blockId),
-                        label: String(node.data.label),
-                        icon: node.data.icon,
-                      },
-                    });
-                  }
+                  if (node.data) setConfigModalNode(node);
                 }}
               />
             </ReactFlowProvider>
@@ -772,25 +755,35 @@ export default function DashboardPage() {
         onChange={handleFileChange}
       />
       <ExecutionLogPanel />
-      {entryModalFields && entryModalFields.length > 0 && (
-        <EntryInputsModal
-          fields={entryModalFields}
-          onSubmit={(values) => runWorkflowWithEntryValues(values)}
-          onCancel={() => setEntryModalFields(null)}
+      {configModalNode && (
+        <BlockConfigModal
+          nodeId={configModalNode.id}
+          data={configModalNode.data as BlockNodeData}
+          config={(configModalNode.data?.config as Record<string, unknown>) ?? {}}
+          onSave={(config) => {
+            setNodes((prev) =>
+              prev.map((n) =>
+                n.id === configModalNode.id
+                  ? { ...n, data: { ...n.data, config } }
+                  : n
+              )
+            );
+            setConfigModalNode(null);
+          }}
+          onClose={() => setConfigModalNode(null)}
         />
       )}
       {showCreateProductModal && (
         <CreateProductModal
+          onClose={() => setShowCreateProductModal(false)}
+          onSuccess={(product) => {
+            setShowCreateProductModal(false);
+            window.alert(`Agent "${product.name}" created successfully! Check the Marketplace.`);
+          }}
           nodes={nodes}
           edges={edges}
-          onClose={() => setShowCreateProductModal(false)}
-          onSuccess={() => {
-            setShowCreateProductModal(false);
-            window.alert('Agent created successfully!');
-          }}
         />
       )}
     </div>
-    </RequireAuth>
   );
 }

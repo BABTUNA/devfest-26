@@ -35,7 +35,13 @@ function mockOutputType(key: string): string {
   return 'any';
 }
 
-export type BlockNodeData = { blockId: string; label: string; icon?: string };
+export type BlockNodeData = {
+  blockId: string;
+  label: string;
+  icon?: string;
+  /** Saved values for block inputs (e.g. conditional pattern, constant value) */
+  config?: Record<string, unknown>;
+};
 export type BlockFlowNode = Node<BlockNodeData, 'block'>;
 
 function BlockNodeComponent({

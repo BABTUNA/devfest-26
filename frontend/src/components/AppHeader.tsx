@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { FlaskConical, Store, ChartNoAxesCombined, Gauge } from 'lucide-react';
+import { FlaskConical, Store, ChartNoAxesCombined } from 'lucide-react';
 import { TokenBalance } from './TokenBalance';
 import { TokenPurchaseModal } from './TokenPurchaseModal';
 import { UserDropdown } from './UserDropdown';
@@ -12,7 +12,6 @@ const NAV = [
   { href: '/marketplace', label: 'Marketplace', icon: Store },
   { href: '/lab', label: 'Lab', icon: FlaskConical },
   { href: '/analytics', label: 'Analytics', icon: ChartNoAxesCombined },
-  { href: '/usage', label: 'Usage', icon: Gauge },
 ] as const;
 
 export function AppHeader() {

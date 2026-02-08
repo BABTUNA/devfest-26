@@ -133,3 +133,30 @@ export async function runBlock(params: {
     body: params,
   });
 }
+
+export interface ResetResponse {
+  success: boolean;
+  message: string;
+  userId?: string;
+  balance?: number;
+  locked?: boolean;
+}
+
+export async function resetDemoState(): Promise<ResetResponse> {
+  return apiFetch<ResetResponse>('/api/debug/reset', {
+    method: 'POST',
+  });
+}
+
+export async function unlockDemoState(): Promise<ResetResponse> {
+  return apiFetch<ResetResponse>('/api/debug/unlock', {
+    method: 'POST',
+  });
+}
+
+export type ElevenLabsVoice = { voice_id: string; name: string };
+
+export async function getElevenLabsVoices(): Promise<ElevenLabsVoice[]> {
+  const data = await apiFetch<{ voices: ElevenLabsVoice[] }>('/api/elevenlabs/voices');
+  return data.voices ?? [];
+}

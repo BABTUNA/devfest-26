@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@flowglad/server": "^0.18.0",
-    "@supabase/supabase-js": "^2.47.10",
+    "@supabase/supabase-js": "^2.95.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.4",
     "express": "^4.21.1",

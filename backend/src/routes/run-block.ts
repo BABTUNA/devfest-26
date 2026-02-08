@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { flowglad } from '../lib/flowglad.js';
-import { getCustomerExternalId, requireAuth } from '../lib/auth.js';
+import { getCustomerExternalId } from '../lib/auth.js';
 import { getBlockById, type BlockId } from 'shared';
 import { runBlock } from '../services/run-block.js';
 import { deductTokens, getTokenBalance } from '../store/tokenStore.js';
@@ -20,7 +20,7 @@ async function checkUserPurchase(userId: string, priceSlug: string, featureSlug:
     const billingRes = await fetch(`${FLOWGLAD_API_URL}/customers/${userId}/billing`, {
       method: 'GET',
       headers: {
-        Authorization: FLOWGLAD_SECRET_KEY,
+        'Authorization': FLOWGLAD_SECRET_KEY,
         'Content-Type': 'application/json',
       },
     });
@@ -30,7 +30,7 @@ async function checkUserPurchase(userId: string, priceSlug: string, featureSlug:
       return false;
     }
 
-    const billingData = (await billingRes.json()) as {
+    const billingData = await billingRes.json() as {
       purchases?: Array<{ id: string; priceId: string; status: string }>;
       catalog?: {
         products?: Array<{
@@ -75,7 +75,7 @@ async function checkUserPurchase(userId: string, priceSlug: string, featureSlug:
   }
 }
 
-runBlockRouter.post('/', requireAuth, async (req, res) => {
+runBlockRouter.post('/', async (req, res) => {
   try {
     const { blockId, inputs } = req.body as { blockId: BlockId; inputs: Record<string, string | string[]> };
 
@@ -104,7 +104,7 @@ runBlockRouter.post('/', requireAuth, async (req, res) => {
       }
     }
 
-    // Feature access check
+    // Feature access check 
     if (block.featureSlug !== 'free') {
       let hasAccess = false;
 
