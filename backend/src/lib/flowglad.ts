@@ -22,7 +22,7 @@ function createFlowgladStub(_customerExternalId: string) {
 
 export const flowglad = (customerExternalId: string) => {
   if (DEMO_MODE) {
-    return createFlowgladStub(customerExternalId);
+    return createFlowgladStub(customerExternalId) as unknown as FlowgladServer;
   }
   return new FlowgladServer({
     customerExternalId,

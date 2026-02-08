@@ -1,16 +1,12 @@
-import { Router } from 'express';
+import { Router, raw } from 'express';
+import { handleWebhook } from '../webhooks/index.js';
 
 export const webhookRouter = Router();
 
 /**
- * Flowglad uses a "zero webhooks" approach: billing state is queried live via SDK.
- * This endpoint is a placeholder for future webhook support (e.g. subscription.updated, invoice.paid).
- * Verify signature and persist events if Flowglad adds webhooks later.
+ * Flowglad webhook endpoint with signature verification
+ * 
+ * CRITICAL: Uses express.raw() middleware to preserve raw body for signature verification.
+ * The raw body is required to verify the HMAC signature sent by Flowglad.
  */
-webhookRouter.post('/', (req, res) => {
-  const event = req.body;
-  if (event?.type) {
-    console.log('[webhook]', event.type, event.id ?? '');
-  }
-  res.status(200).send();
-});
+webhookRouter.post('/', raw({ type: 'application/json' }), handleWebhook);

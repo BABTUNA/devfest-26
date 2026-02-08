@@ -1,0 +1,10 @@
+{
+  "id": "pay_test123",
+  "type": "payment.failed",
+  "object": "payment",
+  "customer": {
+    "id": "cust_abc123",
+    "externalId": "demo-user-1"
+  },
+  "failureReason": "card_declined"
+}
