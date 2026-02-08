@@ -47,6 +47,8 @@ import { useFlowRunStore } from '@/store/flowRunStore';
 import { useExecutionLog } from '@/store/executionLog';
 import { useTheme } from '@/contexts/ThemeContext';
 import { CreateProductModal } from '@/components/CreateProductModal';
+import { RequireAuth } from '@/components/RequireAuth';
+import { runBlock as runBlockApi } from '@/lib/api';
 
 type FlowNode = BlockFlowNode;
 type FlowEdge = Edge;
@@ -419,7 +421,6 @@ export default function DashboardPage() {
         return;
       }
       setWorkflowRunning(true);
-      const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
       try {
         for (const nodeId of order) {
           const node = nodes.find((n) => n.id === nodeId);
@@ -436,16 +437,8 @@ export default function DashboardPage() {
               inputs[input.key] = entryValues[nodeId]?.[input.key] ?? '';
             }
           }
-          const res = await fetch(`${API_URL}/api/run-block`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-User-Id': 'demo-user-1' },
-            body: JSON.stringify({ blockId: block.id, inputs }),
-          });
-          const json = await res.json();
-          if (!res.ok) {
-            setWorkflowError(json.error ?? `Failed at ${node.data?.label ?? nodeId}`);
-            return;
-          }
+
+          const json = await runBlockApi({ blockId: block.id, inputs });
           setNodeOutput(nodeId, json.outputs ?? {});
         }
       } catch (e) {
@@ -580,8 +573,9 @@ export default function DashboardPage() {
   }, [nodes, edges, setNodes]);
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-1 min-h-0 flex-col px-4 py-6 md:px-6 md:py-8">
-      <div className="mb-5 rounded-2xl border border-app bg-app-surface/75 p-4 md:p-5">
+    <RequireAuth>
+      <div className="mx-auto flex w-full max-w-7xl flex-1 min-h-0 flex-col px-4 py-6 md:px-6 md:py-8">
+        <div className="mb-5 rounded-2xl border border-app bg-app-surface/75 p-4 md:p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-app-fg">Lab</h1>
@@ -739,31 +733,32 @@ export default function DashboardPage() {
             />
           )}
         </div>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json,application/json"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+        <ExecutionLogPanel />
+        {entryModalFields && entryModalFields.length > 0 && (
+          <EntryInputsModal
+            fields={entryModalFields}
+            onSubmit={(values) => runWorkflowWithEntryValues(values)}
+            onCancel={() => setEntryModalFields(null)}
+          />
+        )}
+        {showCreateProductModal && (
+          <CreateProductModal
+            onClose={() => setShowCreateProductModal(false)}
+            onSuccess={(product) => {
+              setShowCreateProductModal(false);
+              window.alert(`Agent "${product.name}" created successfully! Check the Marketplace.`);
+            }}
+          />
+        )}
       </div>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".json,application/json"
-        className="hidden"
-        onChange={handleFileChange}
-      />
-      <ExecutionLogPanel />
-      {entryModalFields && entryModalFields.length > 0 && (
-        <EntryInputsModal
-          fields={entryModalFields}
-          onSubmit={(values) => runWorkflowWithEntryValues(values)}
-          onCancel={() => setEntryModalFields(null)}
-        />
-      )}
-      {showCreateProductModal && (
-        <CreateProductModal
-          onClose={() => setShowCreateProductModal(false)}
-          onSuccess={(product) => {
-            setShowCreateProductModal(false);
-            window.alert(`Agent "${product.name}" created successfully! Check the Marketplace.`);
-          }}
-        />
-      )}
-    </div>
+    </RequireAuth>
   );
 }

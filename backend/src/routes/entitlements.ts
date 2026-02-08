@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { flowglad } from '../lib/flowglad.js';
-import { getCustomerExternalId } from '../lib/auth.js';
+import { getCustomerExternalId, requireAuth } from '../lib/auth.js';
 import { BLOCK_DEFINITIONS } from 'shared';
 import { getDemoEntitlements } from './checkout.js';
 
@@ -39,7 +39,7 @@ interface FlowgladBillingResponse {
   };
 }
 
-entitlementsRouter.get('/', async (req, res) => {
+entitlementsRouter.get('/', requireAuth, async (req, res) => {
   try {
     const userId = await getCustomerExternalId(req);
     const access: Record<string, boolean> = {};
@@ -65,13 +65,13 @@ entitlementsRouter.get('/', async (req, res) => {
         const billingRes = await fetch(`${FLOWGLAD_API_URL}/customers/${userId}/billing`, {
           method: 'GET',
           headers: {
-            'Authorization': FLOWGLAD_SECRET_KEY,
+            Authorization: FLOWGLAD_SECRET_KEY,
             'Content-Type': 'application/json',
           },
         });
 
         if (billingRes.ok) {
-          const billingData = await billingRes.json() as FlowgladBillingResponse;
+          const billingData = (await billingRes.json()) as FlowgladBillingResponse;
 
           console.log(`[Entitlements] User ${userId} billing data:`, JSON.stringify(billingData, null, 2).substring(0, 500));
 
@@ -94,7 +94,6 @@ entitlementsRouter.get('/', async (req, res) => {
           // Check purchases and grant access
           if (billingData.purchases) {
             for (const purchase of billingData.purchases) {
-              // Only count completed purchases (status might be 'completed' or similar)
               // For single_payment products, any purchase = access
               const priceSlug = priceIdToSlug.get(purchase.priceId);
               if (priceSlug) {

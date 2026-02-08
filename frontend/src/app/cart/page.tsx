@@ -7,6 +7,7 @@ import type { BlockDefinition, BlockId } from 'shared';
 import { createCheckoutSession, getProducts } from '@/lib/api';
 import { useAppBilling } from '@/contexts/AppBillingContext';
 import { useCartStore } from '@/store/cartStore';
+import { RequireAuth } from '@/components/RequireAuth';
 
 const CHECKOUT_QUEUE_STORAGE_KEY = 'flowglad-cart-checkout-queue';
 const CHECKOUT_QUEUE_TITLES_STORAGE_KEY = 'flowglad-cart-checkout-titles';
@@ -237,11 +238,12 @@ export default function CheckoutPage() {
   }, [refreshEntitlements, startCheckout]);
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-6 md:px-6 md:py-8">
-      <h1 className="text-2xl font-semibold tracking-tight text-app-fg">Cart</h1>
-      <p className="mt-1 text-sm text-app-soft">
-        Select locked block items, then start Flowglad checkout for the selected group.
-      </p>
+    <RequireAuth>
+      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-6 md:px-6 md:py-8">
+        <h1 className="text-2xl font-semibold tracking-tight text-app-fg">Cart</h1>
+        <p className="mt-1 text-sm text-app-soft">
+          Select locked block items, then start Flowglad checkout for the selected group.
+        </p>
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs">
         {entitlementsLoading && (
@@ -416,26 +418,27 @@ export default function CheckoutPage() {
         </div>
       )}
 
-      <div className="mt-8 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void refreshEntitlements()}
-          className="rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
-        >
-          Refresh entitlements
-        </button>
-        <button
-          type="button"
-          onClick={clearCart}
-          className="inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
-        >
-          <XCircle className="h-4 w-4" />
-          Clear cart
-        </button>
-        <Link href="/profile" className="text-sm text-blue-700 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200">
-          View subscriptions and invoices
-        </Link>
+        <div className="mt-8 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => void refreshEntitlements()}
+            className="rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
+          >
+            Refresh entitlements
+          </button>
+          <button
+            type="button"
+            onClick={clearCart}
+            className="inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
+          >
+            <XCircle className="h-4 w-4" />
+            Clear cart
+          </button>
+          <Link href="/profile" className="text-sm text-blue-700 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-200">
+            View subscriptions and invoices
+          </Link>
+        </div>
       </div>
-    </div>
+    </RequireAuth>
   );
 }

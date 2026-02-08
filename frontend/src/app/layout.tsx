@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Manrope, IBM_Plex_Mono } from 'next/font/google';
 import { AppBillingRoot } from '@/contexts/AppBillingContext';
+import { AuthProvider } from '@/contexts/AuthContext';
 import { TokenProvider } from '@/contexts/TokenContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AppHeader } from '@/components/AppHeader';
@@ -38,17 +39,19 @@ export default function RootLayout({
       </head>
       <body className={`${manrope.variable} ${ibmPlexMono.variable} antialiased min-h-screen font-sans bg-app text-app-fg`}>
         <ThemeProvider>
-          <TokenProvider>
-            <AppBillingRoot>
-              <div className="relative flex min-h-screen flex-col">
-                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(59,130,246,0.2),transparent_35%),radial-gradient(circle_at_85%_80%,rgba(14,165,233,0.14),transparent_30%)]" />
+          <AuthProvider>
+            <TokenProvider>
+              <AppBillingRoot>
                 <div className="relative flex min-h-screen flex-col">
-                  <AppHeader />
-                  <main className="flex min-h-0 flex-1 flex-col">{children}</main>
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(59,130,246,0.2),transparent_35%),radial-gradient(circle_at_85%_80%,rgba(14,165,233,0.14),transparent_30%)]" />
+                  <div className="relative flex min-h-screen flex-col">
+                    <AppHeader />
+                    <main className="flex min-h-0 flex-1 flex-col">{children}</main>
+                  </div>
                 </div>
-              </div>
-            </AppBillingRoot>
-          </TokenProvider>
+              </AppBillingRoot>
+            </TokenProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
