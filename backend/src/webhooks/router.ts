@@ -2,7 +2,7 @@
  * Event router - dispatches webhook events to appropriate handlers
  */
 
-import { FlowgladWebhookEvent } from '../types.js';
+import { FlowgladWebhookEvent } from './types.js';
 import { handlers } from './handlers/index.js';
 import { logWebhook, logWebhookError } from './logging.js';
 
