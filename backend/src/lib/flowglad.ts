@@ -23,10 +23,9 @@ function createFlowgladStub(_customerExternalId: string): FlowgladServer {
 
 export const flowglad = (customerExternalId: string): FlowgladServer => {
   if (DEMO_MODE) {
-    console.log('[Flowglad] Using DEMO stub for customer:', customerExternalId);
-    return createFlowgladStub(customerExternalId);
+    return createFlowgladStub(customerExternalId) as unknown as FlowgladServer;
   }
-
+  
   if (!SECRET_KEY) {
     console.error('[Flowglad] FLOWGLAD_SECRET_KEY is not set!');
     throw new Error('FLOWGLAD_SECRET_KEY environment variable is required');
