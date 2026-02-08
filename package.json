@@ -3,7 +3,8 @@
   "private": true,
   "description": "Modular AI Block Marketplace with Flowglad",
   "scripts": {
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "npm run build -w shared && concurrently \"npm run dev:shared\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:shared": "npm run build -w shared -- --watch",
     "dev:frontend": "npm run dev -w frontend",
     "dev:backend": "npm run dev -w backend",
     "build": "npm run build -w shared && npm run build -w backend && npm run build -w frontend",

@@ -1,22 +1,25 @@
 import type { Metadata } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import { Manrope, IBM_Plex_Mono } from 'next/font/google';
 import { AppBillingRoot } from '@/contexts/AppBillingContext';
 import { TokenProvider } from '@/contexts/TokenContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AppHeader } from '@/components/AppHeader';
 import './globals.css';
 
-const inter = Inter({
+const manrope = Manrope({
   variable: '--font-sans',
   subsets: ['latin'],
 });
-const jetbrainsMono = JetBrains_Mono({
+
+const ibmPlexMono = IBM_Plex_Mono({
   variable: '--font-mono',
   subsets: ['latin'],
+  weight: ['400', '500'],
 });
 
 export const metadata: Metadata = {
-  title: 'AI Block Marketplace',
-  description: 'Modular AI-powered blocks with Flowglad billing',
+  title: 'Handi',
+  description: 'Modular AI-powered blocks with entitlement-based access and Flowglad billing',
 };
 
 export default function RootLayout({
@@ -26,14 +29,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.variable} ${jetbrainsMono.variable} antialiased bg-zinc-950 text-zinc-100 min-h-screen font-sans`}>
+      <body className={`${manrope.variable} ${ibmPlexMono.variable} antialiased min-h-screen font-sans bg-app text-app-fg`}>
         <TokenProvider>
-          <AppBillingRoot>
-            <div className="flex flex-col min-h-screen">
-              <AppHeader />
-              <main className="flex-1 flex flex-col min-h-0">{children}</main>
-            </div>
-          </AppBillingRoot>
+          <ThemeProvider>
+            <AppBillingRoot>
+              <div className="relative flex min-h-screen flex-col">
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(59,130,246,0.2),transparent_35%),radial-gradient(circle_at_85%_80%,rgba(14,165,233,0.14),transparent_30%)]" />
+                <div className="relative flex min-h-screen flex-col">
+                  <AppHeader />
+                  <main className="flex min-h-0 flex-1 flex-col">{children}</main>
+                </div>
+              </div>
+            </AppBillingRoot>
+          </ThemeProvider>
         </TokenProvider>
       </body>
     </html>

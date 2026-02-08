@@ -8,10 +8,8 @@ import { useTokens } from '@/contexts/TokenContext';
 import { useExecutionLog } from '@/store/executionLog';
 import { useFlowRunStore } from '@/store/flowRunStore';
 import { getInputSource } from '@/lib/workflowLogic';
+import { DEMO_MODE, createCheckoutSession, runBlock } from '@/lib/api';
 import type { Node, Edge } from '@xyflow/react';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
-const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
 type NodeData = { blockId: string; label: string; icon?: string };
 
@@ -29,9 +27,9 @@ export function RunBlockPanel({
   onClose: () => void;
 }) {
   const block = getBlockById(data.blockId as BlockId);
-  const { checkFeatureAccess, createCheckoutSession, loaded } = useAppBilling();
-  const { balance, deductLocally, refresh: refreshTokens } = useTokens();
-  const hasAccess = DEMO_MODE || (loaded && (checkFeatureAccess?.(block?.featureSlug ?? '') ?? false));
+  const { hasFeatureAccess } = useAppBilling();
+  const { deductLocally, refresh: refreshTokens } = useTokens();
+  const hasAccess = DEMO_MODE || (block ? hasFeatureAccess(block.featureSlug) : false);
   const getOutput = useFlowRunStore((s) => s.getOutput);
   const setNodeOutput = useFlowRunStore((s) => s.setNodeOutput);
   const getOutputs = useFlowRunStore((s) => s.outputsByNode[nodeId]);
@@ -75,14 +73,14 @@ export function RunBlockPanel({
 
   if (!block) {
     return (
-      <div className="flex flex-col h-full bg-zinc-900 border-l border-zinc-800 w-96">
-        <div className="p-3 border-b border-zinc-800 flex items-center justify-between">
-          <span className="text-sm font-medium text-zinc-400">Unknown block</span>
-          <button onClick={onClose} className="p-1 rounded hover:bg-zinc-800 text-zinc-400">
+      <div className="flex h-full w-96 flex-col border-l border-app bg-app-surface">
+        <div className="flex items-center justify-between border-b border-app p-3">
+          <span className="text-sm font-medium text-app-soft">Unknown block</span>
+          <button onClick={onClose} className="rounded p-1 text-app-soft hover:bg-app-surface">
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="p-4 text-zinc-500 text-sm">Block definition not found.</div>
+        <div className="p-4 text-sm text-app-soft">Block definition not found.</div>
       </div>
     );
   }
@@ -95,27 +93,22 @@ export function RunBlockPanel({
     setOutput(null);
     const payload = { ...resolvedInputs };
     try {
-      const res = await fetch(`${API_URL}/api/run-block`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-User-Id': 'demo-user-2' },
-        body: JSON.stringify({ blockId: block.id, inputs: payload }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        if (res.status === 402 && json.needsPurchase) {
-          setError(`Insufficient tokens. Need ${json.tokenCost}, you have ${json.currentBalance}.`);
-          setNeedsTokens(true);
-          logAdd({ blockName: data.label, blockId: block.id, success: false, error: 'Insufficient tokens' });
-          return;
-        }
-        const errMsg =
-          json.priceSlug && res.status === 403
-            ? 'Block is locked. Unlock it from Block Library or Checkout.'
-            : json.error ?? 'Failed to run block';
-        setError(errMsg);
-        logAdd({ blockName: data.label, blockId: block.id, success: false, error: errMsg });
+      const json = await runBlock({ blockId: block.id, inputs: payload });
+
+      // Check for token-related errors
+      if (json.error && json.needsPurchase) {
+        setError(`Insufficient tokens. Need ${json.tokenCost}, you have ${json.currentBalance}.`);
+        setNeedsTokens(true);
+        logAdd({ blockName: data.label, blockId: block.id, success: false, error: 'Insufficient tokens' });
         return;
       }
+
+      if (json.error) {
+        setError(json.error);
+        logAdd({ blockName: data.label, blockId: block.id, success: false, error: json.error });
+        return;
+      }
+
       // Deduct locally to update UI before next refresh
       if (block.tokenCost > 0) {
         deductLocally(block.tokenCost);
@@ -139,34 +132,35 @@ export function RunBlockPanel({
     (!block.inputs.some((i) => i.required) || textInputs.every((i) => (resolvedInputs[i.key] ?? '').trim()));
 
   return (
-    <div className="flex flex-col h-full bg-zinc-900 border-l border-zinc-800 w-96 shrink-0">
-      <div className="p-3 border-b border-zinc-800 flex items-center justify-between">
-        <span className="text-sm font-medium text-zinc-100">Run: {data.label}</span>
-        <button
-          onClick={onClose}
-          className="p-1 rounded hover:bg-zinc-800 text-zinc-400"
-          aria-label="Close"
-        >
+    <div className="flex h-full w-96 shrink-0 flex-col border-l border-app bg-app-surface">
+      <div className="flex items-center justify-between border-b border-app p-3">
+        <span className="text-sm font-medium text-app-fg">Run: {data.label}</span>
+        <button onClick={onClose} className="rounded p-1 text-app-soft hover:bg-app-card" aria-label="Close">
           <X className="h-4 w-4" />
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 space-y-4 overflow-y-auto p-4">
         {!hasAccess ? (
-          <div className="rounded-lg border border-amber-700/50 bg-amber-900/20 p-3 text-sm text-amber-200">
-            <p className="flex items-center gap-2 mb-2">
+          <div className="rounded-lg border border-amber-500/35 bg-amber-500/10 p-3 text-sm text-amber-200">
+            <p className="mb-2 flex items-center gap-2">
               <Lock className="h-4 w-4" />
               This block is locked
             </p>
-            <p className="text-amber-200/80 mb-3">Unlock it from Block Library or Checkout to run it here.</p>
+            <p className="mb-3 text-amber-100/90">Unlock it to run from the Lab canvas.</p>
             <button
-              onClick={() =>
-                createCheckoutSession?.({
+              onClick={async () => {
+                const baseUrl = window.location.origin;
+                const session = await createCheckoutSession({
                   priceSlug: block.priceSlug,
-                  successUrl: window.location.href,
-                  cancelUrl: window.location.href,
-                  autoRedirect: true,
-                })
-              }
+                  successUrl: `${baseUrl}/marketplace?checkout=success`,
+                  cancelUrl: `${baseUrl}/lab`,
+                });
+                if (!session?.url) {
+                  setError('Checkout URL missing from backend response');
+                  return;
+                }
+                window.location.href = session.url;
+              }}
               className="rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-500"
             >
               Unlock block
@@ -174,24 +168,24 @@ export function RunBlockPanel({
           </div>
         ) : (
           <>
-            <p className="text-xs text-zinc-500">
-              Inputs from connected blocks use cached output from the last run. Run upstream blocks first, or use Run workflow.
+            <p className="text-xs text-app-soft">
+              Connected inputs consume cached output from upstream blocks. Run upstream blocks first if values are missing.
             </p>
             {inputSources.map(({ key, label, source }) => (
               <div key={key}>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">{label}</label>
+                <label className="mb-1 block text-xs font-medium text-app-soft">{label}</label>
                 {source.type === 'connected' ? (
-                  <div className="rounded-lg border border-zinc-700 bg-zinc-800/80 px-3 py-2 text-xs">
-                    <div className="flex items-center gap-1.5 text-emerald-400">
+                  <div className="rounded-lg border border-app bg-app-card px-3 py-2 text-xs">
+                    <div className="flex items-center gap-1.5 text-blue-300">
                       <Link2 className="h-3.5 w-3.5 shrink-0" />
                       From {source.sourceLabel}.{source.sourceHandle}
                     </div>
                     {getOutput(source.sourceNodeId, source.sourceHandle) != null ? (
-                      <p className="mt-1 text-zinc-300 truncate" title={String(getOutput(source.sourceNodeId, source.sourceHandle))}>
+                      <p className="mt-1 truncate text-app-fg" title={String(getOutput(source.sourceNodeId, source.sourceHandle))}>
                         {String(getOutput(source.sourceNodeId, source.sourceHandle))}
                       </p>
                     ) : (
-                      <p className="mt-1 text-amber-400">Run upstream block first</p>
+                      <p className="mt-1 text-amber-300">Run upstream block first</p>
                     )}
                   </div>
                 ) : (
@@ -199,23 +193,21 @@ export function RunBlockPanel({
                     placeholder={block.inputs?.find((i) => i.key === key)?.required ? 'Required' : 'Optional'}
                     value={inputs[key] ?? ''}
                     onChange={(e) => setInputs((prev) => ({ ...prev, [key]: e.target.value }))}
-                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-emerald-500 focus:outline-none resize-none"
+                    className="w-full resize-none rounded-lg border border-app bg-app-card px-3 py-2 text-sm text-app-fg placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
                     rows={2}
                   />
                 )}
               </div>
             ))}
-            {block.inputs.some((i) => i.type === 'file') && (
-              <p className="text-xs text-zinc-500">File inputs: use Block Library for this block.</p>
-            )}
+            {block.inputs.some((i) => i.type === 'file') && <p className="text-xs text-app-soft">File input blocks are best run from Marketplace.</p>}
             {missingLabel && missingLabel.type === 'connected' && (
-              <p className="text-xs text-amber-400">Run &quot;{missingLabel.sourceLabel}&quot; first to fill connected inputs.</p>
+              <p className="text-xs text-amber-300">Run &quot;{missingLabel.sourceLabel}&quot; first to fill connected inputs.</p>
             )}
             <div className="flex items-center justify-between gap-2">
               <button
                 onClick={handleRun}
                 disabled={loading || !canRun}
-                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                 Run
@@ -229,11 +221,11 @@ export function RunBlockPanel({
             </div>
           </>
         )}
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-sm text-rose-300">{error}</p>}
         {output != null && (
           <div>
-            <p className="text-xs font-medium text-zinc-400 mb-1">Output (cached for downstream)</p>
-            <pre className="rounded-lg bg-zinc-800 p-3 text-xs text-zinc-300 overflow-auto max-h-48">
+            <p className="mb-1 text-xs font-medium text-app-soft">Output (cached for downstream)</p>
+            <pre className="max-h-48 overflow-auto rounded-lg border border-app bg-app-card p-3 text-xs text-app-fg">
               {JSON.stringify(output, null, 2)}
             </pre>
           </div>

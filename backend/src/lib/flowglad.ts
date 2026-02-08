@@ -9,7 +9,7 @@ const DEMO_USERS: Record<string, { email: string; name: string }> = {
 };
 
 /** Stub used when DEMO_MODE=true so we never need FLOWGLAD_SECRET_KEY. */
-function createFlowgladStub(_customerExternalId: string) {
+function createFlowgladStub(_customerExternalId: string): FlowgladServer {
   return {
     getBilling: async () => ({
       checkFeatureAccess: () => true,
@@ -18,10 +18,10 @@ function createFlowgladStub(_customerExternalId: string) {
     createUsageEvent: async () => { },
     findOrCreateCustomer: async () => ({}),
     createCheckoutSession: async () => ({ checkoutSession: null }),
-  };
+  } as unknown as FlowgladServer;
 }
 
-export const flowglad = (customerExternalId: string) => {
+export const flowglad = (customerExternalId: string): FlowgladServer => {
   if (DEMO_MODE) {
     console.log('[Flowglad] Using DEMO stub for customer:', customerExternalId);
     return createFlowgladStub(customerExternalId);

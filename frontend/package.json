@@ -11,11 +11,11 @@
   "dependencies": {
     "@flowglad/nextjs": "^0.18.0",
     "@xyflow/react": "^12.3.5",
-    "shared": "file:../shared",
     "lucide-react": "^0.468.0",
-    "next": "15.0.3",
+    "next": "^15.5.12",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "shared": "file:../shared",
     "zustand": "^5.0.2"
   },
   "devDependencies": {

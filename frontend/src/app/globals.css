@@ -3,16 +3,78 @@
 @tailwind utilities;
 
 :root {
-  --foreground: 244 244 245;
-  --background: 9 9 10;
+  color-scheme: dark;
+}
+
+.dark {
+  --app-bg: 2 6 23;
+  --app-surface: 15 23 42;
+  --app-card: 15 23 42;
+  --app-muted: 51 65 85;
+  --app-fg: 241 245 249;
+  --app-fg-soft: 148 163 184;
+  --app-border: 51 65 85;
+  --app-accent: 59 130 246;
+  --app-accent-soft: 29 78 216;
+  --app-danger: 248 113 113;
+}
+
+.light {
+  color-scheme: light;
+  --app-bg: 248 250 252;
+  --app-surface: 255 255 255;
+  --app-card: 255 255 255;
+  --app-muted: 148 163 184;
+  --app-fg: 15 23 42;
+  --app-fg-soft: 71 85 105;
+  --app-border: 203 213 225;
+  --app-accent: 37 99 235;
+  --app-accent-soft: 30 64 175;
+  --app-danger: 220 38 38;
 }
 
 body {
-  color: rgb(var(--foreground));
-  background: rgb(var(--background));
+  background: rgb(var(--app-bg));
+  color: rgb(var(--app-fg));
 }
 
 @layer utilities {
+  .bg-app {
+    background-color: rgb(var(--app-bg));
+  }
+
+  .bg-app-surface {
+    background-color: rgb(var(--app-surface));
+  }
+
+  .bg-app-card {
+    background-color: rgb(var(--app-card));
+  }
+
+  .text-app {
+    color: rgb(var(--app-fg));
+  }
+
+  .text-app-fg {
+    color: rgb(var(--app-fg));
+  }
+
+  .text-app-soft {
+    color: rgb(var(--app-fg-soft));
+  }
+
+  .border-app {
+    border-color: rgb(var(--app-border));
+  }
+
+  .bg-app-accent {
+    background-color: rgb(var(--app-accent));
+  }
+
+  .bg-app-accent-soft {
+    background-color: rgb(var(--app-accent-soft));
+  }
+
   .text-balance {
     text-wrap: balance;
   }
