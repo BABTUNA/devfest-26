@@ -287,6 +287,34 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     ],
     outputs: [{ key: 'text', label: 'Extracted text' }, { key: 'title', label: 'Page title' }],
   },
+  {
+    id: 'send-slack',
+    name: 'Send to Slack',
+    description: 'Send a message to a Slack channel via webhook',
+    icon: 'MessageSquare',
+    featureSlug: 'integrations',
+    priceSlug: 'integrations',
+    usesAI: false,
+    inputs: [
+      { key: 'webhookUrl', label: 'Webhook URL', type: 'text', required: true },
+      { key: 'message', label: 'Message', type: 'text', required: true },
+    ],
+    outputs: [{ key: 'status', label: 'Status' }],
+  },
+  {
+    id: 'send-discord',
+    name: 'Send to Discord',
+    description: 'Send a message to a Discord channel via webhook',
+    icon: 'MessageCircle',
+    featureSlug: 'integrations',
+    priceSlug: 'integrations',
+    usesAI: false,
+    inputs: [
+      { key: 'webhookUrl', label: 'Webhook URL', type: 'text', required: true },
+      { key: 'message', label: 'Message', type: 'text', required: true },
+    ],
+    outputs: [{ key: 'status', label: 'Status' }],
+  },
 ];
 
 export function getBlockById(id: BlockId): BlockDefinition | undefined {
