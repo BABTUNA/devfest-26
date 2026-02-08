@@ -2,7 +2,7 @@
 
 import { memo } from 'react';
 import { Handle, type Node, type NodeProps, Position } from '@xyflow/react';
-import { Brain, Mail, PenLine, TestTube, FileStack, Play, Layers, Type, GitBranch, Check } from 'lucide-react';
+import { Brain, Mail, PenLine, TestTube, FileStack, Play, Layers, Type, GitBranch, Check, Languages, Volume2, Mic, MessageSquare, Hash, Globe2 } from 'lucide-react';
 import { getBlockById, type BlockId } from 'shared';
 import { useFlowRunStore } from '@/store/flowRunStore';
 
@@ -16,6 +16,12 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Layers,
   Type,
   GitBranch,
+  Languages,
+  Volume2,
+  Mic,
+  MessageSquare,
+  Hash,
+  Globe2,
 };
 
 /** Mock output type for display when not in schema */
@@ -45,18 +51,18 @@ function BlockNodeComponent({
 
   return (
     <div
-      className={`min-w-[220px] overflow-hidden rounded-2xl border bg-app-surface shadow-lg backdrop-blur ${
-        selected ? 'border-blue-500 ring-2 ring-blue-500/35' : 'border-app'
+      className={`min-w-[220px] overflow-hidden rounded-2xl border bg-app-surface shadow-lg backdrop-blur transition ${
+        selected ? 'border-blue-500 ring-2 ring-blue-500/35' : 'border-app hover:border-blue-500/45'
       }`}
     >
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-app bg-app-card px-3 py-2">
         <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-app bg-app-surface">
-          <Icon className="h-3.5 w-3.5 text-blue-300" />
+          <Icon className="h-3.5 w-3.5 text-blue-700 dark:text-blue-300" />
         </span>
         <span className="flex-1 truncate text-sm font-medium text-app-fg">{data.label}</span>
         {hasCachedOutput && (
-          <span className="flex shrink-0 items-center gap-0.5 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-300" title="Has cached output">
+          <span className="flex shrink-0 items-center gap-0.5 rounded bg-emerald-100 dark:bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:text-emerald-300" title="Has cached output">
             <Check className="h-3 w-3" />
             out
           </span>
@@ -76,7 +82,7 @@ function BlockNodeComponent({
               type="target"
               position={Position.Left}
               id={input.key}
-              className="!-left-1.5 !h-2.5 !w-2.5 !border-2 !border-slate-900 !bg-amber-400"
+              className="!-left-1.5 !h-2.5 !w-2.5 !border-2 !border-[rgb(var(--app-bg))] !bg-amber-400"
             />
             <span className="flex-1 truncate text-xs text-app-soft" title={`${input.label} (${input.type})`}>
               {input.label} <span className="text-[11px] text-app-soft">({input.type})</span>
@@ -101,7 +107,7 @@ function BlockNodeComponent({
               type="source"
               position={Position.Right}
               id={output.key}
-              className="!-right-1.5 !h-2.5 !w-2.5 !border-2 !border-slate-900 !bg-emerald-500"
+              className="!-right-1.5 !h-2.5 !w-2.5 !border-2 !border-[rgb(var(--app-bg))] !bg-emerald-500"
             />
           </div>
         ))}

@@ -60,6 +60,8 @@ export type CheckoutResponse = {
     id?: string;
     url?: string;
   } | null;
+  id?: string;
+  url?: string;
 };
 
 export type RunBlockResponse = {
@@ -83,14 +85,21 @@ export async function getEntitlementsData(): Promise<EntitlementsResponse> {
 
 export async function createCheckoutSession(params: {
   priceSlug: string;
+  priceSlugs?: string[];
   successUrl: string;
   cancelUrl: string;
+  outputName?: string;
+  outputMetadata?: Record<string, string | number | boolean>;
 }): Promise<CheckoutResponse['checkoutSession']> {
   const data = await apiRequest<CheckoutResponse>('/api/checkout', {
     method: 'POST',
     body: params,
   });
-  return data.checkoutSession;
+  if (data.checkoutSession) return data.checkoutSession;
+  if (data.url || data.id) {
+    return { id: data.id, url: data.url };
+  }
+  return null;
 }
 
 export async function runBlock(params: {

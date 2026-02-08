@@ -165,8 +165,8 @@ function FlowCanvas({
 }) {
   const { screenToFlowPosition } = useReactFlow();
   const isDark = theme === 'dark';
-  const majorGrid = isDark ? '#314053' : '#cbd5e1';
-  const minorGrid = isDark ? '#1d2838' : '#e2e8f0';
+  const majorGrid = isDark ? '#475569' : '#94a3b8';
+  const minorGrid = isDark ? '#334155' : '#b0bec5';
   const lineColor = isDark ? '#22c55e' : '#15803d';
 
   const onConnect = useCallback(
@@ -284,14 +284,15 @@ function FlowCanvas({
         onPaneClick={handlePaneClick}
         nodeTypes={nodeTypes}
         fitView
-        className="bg-app"
+        colorMode={isDark ? 'dark' : 'light'}
+        style={{ '--xy-background-color': `rgb(${isDark ? '2,6,23' : '248,250,252'})` } as React.CSSProperties}
         snapToGrid
         snapGrid={[16, 16]}
         defaultEdgeOptions={{ type: 'default' }}
         connectionLineStyle={{ stroke: lineColor, strokeWidth: 2 }}
       >
-        <Background color={minorGrid} gap={16} size={0.8} />
-        <Background color={majorGrid} gap={80} size={1.15} />
+        <Background color={minorGrid} gap={16} size={1.5} />
+        <Background color={majorGrid} gap={80} size={2} />
         <Controls className="!border-app !bg-app-surface !text-app-soft" />
         <MiniMap
           nodeColor={lineColor}
@@ -345,7 +346,7 @@ export default function DashboardPage() {
   const getOutput = useFlowRunStore((s) => s.getOutput);
   const clearRunCache = useFlowRunStore((s) => s.clearAll);
   const { isVisible, setVisible } = useExecutionLog();
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const [showCreateProductModal, setShowCreateProductModal] = useState(false);
 
   useEffect(() => {
@@ -584,13 +585,14 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-1 min-h-0 flex-col px-4 py-6 md:px-6 md:py-8">
-      <h1 className="text-2xl font-semibold tracking-tight text-app-fg">Lab</h1>
-      <p className="mt-1 text-sm text-app-soft">
-        Build block-based workflows, run them end-to-end, and inspect outputs as you iterate.
-      </p>
-
-      <div className="mt-5 rounded-2xl border border-app bg-app-surface/75 p-4">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="mb-5 rounded-2xl border border-app bg-app-surface/75 p-4 md:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-app-fg">Lab</h1>
+            <p className="mt-1 text-sm text-app-soft">
+              Build block-based workflows, run them end-to-end, and inspect outputs as you iterate.
+            </p>
+          </div>
           <Link
             href="/"
             className="inline-flex items-center gap-1.5 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
@@ -598,6 +600,9 @@ export default function DashboardPage() {
             <Home className="h-4 w-4" />
             Home
           </Link>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={handleRunWorkflow}
@@ -636,7 +641,7 @@ export default function DashboardPage() {
           <button
             type="button"
             onClick={handlePrepopulate}
-            className="rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-300 transition hover:bg-amber-500/20"
+            className="rounded-lg border border-amber-300 dark:border-amber-500/35 bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-700 dark:text-amber-300 transition hover:bg-amber-100 dark:hover:bg-amber-500/20"
             title="Load Constant → Summarize test flow"
           >
             Prepopulate
@@ -645,7 +650,7 @@ export default function DashboardPage() {
             type="button"
             onClick={() => setVisible(!isVisible)}
             className={`inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm transition ${isVisible
-              ? 'bg-blue-600/15 text-blue-300'
+              ? 'bg-blue-100 dark:bg-blue-600/15 text-blue-700 dark:text-blue-300'
               : 'text-app-soft hover:bg-app-surface hover:text-app-fg'
               }`}
           >
@@ -687,15 +692,15 @@ export default function DashboardPage() {
           </span>
         </div>
         {workflowError && (
-          <p className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+          <p className="mt-3 rounded-lg border border-rose-300 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 px-3 py-2 text-sm text-rose-700 dark:text-rose-300">
             {workflowError}
           </p>
         )}
       </div>
 
-      <div className="mt-4 flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-app bg-app-surface/70">
+      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[260px_1fr]">
         <BlockPalette onAddBlock={addBlockAt} />
-        <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 overflow-hidden rounded-2xl border border-app bg-app-surface/70">
           <div className="min-h-0 flex-1">
             <ReactFlowProvider>
               <FlowCanvas
@@ -712,7 +717,7 @@ export default function DashboardPage() {
                 selectedNodeIds={selectedNodeIds}
                 setSelectedNodeIds={setSelectedNodeIds}
                 removeNodes={removeNodes}
-                theme={theme}
+                theme={resolvedTheme}
                 onNodeDoubleClick={(e, node) => {
                   if (node.data) {
                     setRunPanelNode({

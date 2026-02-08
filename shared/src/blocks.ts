@@ -4,7 +4,6 @@ export type BlockId =
   | 'rewrite-prompt'
   | 'classify-input'
   | 'merge-pdfs'
-  | 'trigger'
   | 'text-join'
   | 'constant'
   | 'conditional'
@@ -110,17 +109,6 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
     outputs: [{ key: 'mergedUrl', label: 'Download link' }],
   },
   // --- Workflow utility blocks (free, no billing) ---
-  {
-    id: 'trigger',
-    name: 'Trigger',
-    description: 'Start of a workflow. No inputs; outputs a signal so other blocks can depend on it.',
-    icon: 'Play',
-    featureSlug: 'free',
-    priceSlug: 'free',
-    usesAI: false,
-    inputs: [],
-    outputs: [{ key: 'trigger', label: 'Signal' }],
-  },
   {
     id: 'text-join',
     name: 'Text Join',
@@ -286,34 +274,6 @@ export const BLOCK_DEFINITIONS: BlockDefinition[] = [
       { key: 'extractSelector', label: 'Extract selector (optional)', type: 'text', required: false },
     ],
     outputs: [{ key: 'text', label: 'Extracted text' }, { key: 'title', label: 'Page title' }],
-  },
-  {
-    id: 'send-slack',
-    name: 'Send to Slack',
-    description: 'Send a message to a Slack channel via webhook',
-    icon: 'MessageSquare',
-    featureSlug: 'integrations',
-    priceSlug: 'integrations',
-    usesAI: false,
-    inputs: [
-      { key: 'webhookUrl', label: 'Webhook URL', type: 'text', required: true },
-      { key: 'message', label: 'Message', type: 'text', required: true },
-    ],
-    outputs: [{ key: 'status', label: 'Status' }],
-  },
-  {
-    id: 'send-discord',
-    name: 'Send to Discord',
-    description: 'Send a message to a Discord channel via webhook',
-    icon: 'MessageCircle',
-    featureSlug: 'integrations',
-    priceSlug: 'integrations',
-    usesAI: false,
-    inputs: [
-      { key: 'webhookUrl', label: 'Webhook URL', type: 'text', required: true },
-      { key: 'message', label: 'Message', type: 'text', required: true },
-    ],
-    outputs: [{ key: 'status', label: 'Status' }],
   },
 ];
 

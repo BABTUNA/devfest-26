@@ -28,10 +28,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var d=document.documentElement,s=localStorage.getItem('ai-block-marketplace-theme')||'dark';if(s==='system'){s=window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'}d.classList.add(s)}catch(e){d.classList.add('dark')}})()`,
+          }}
+        />
+      </head>
       <body className={`${manrope.variable} ${ibmPlexMono.variable} antialiased min-h-screen font-sans bg-app text-app-fg`}>
-        <TokenProvider>
-          <ThemeProvider>
+        <ThemeProvider>
+          <TokenProvider>
             <AppBillingRoot>
               <div className="relative flex min-h-screen flex-col">
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(59,130,246,0.2),transparent_35%),radial-gradient(circle_at_85%_80%,rgba(14,165,233,0.14),transparent_30%)]" />
@@ -41,8 +48,8 @@ export default function RootLayout({
                 </div>
               </div>
             </AppBillingRoot>
-          </ThemeProvider>
-        </TokenProvider>
+          </TokenProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

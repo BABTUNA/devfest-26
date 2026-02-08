@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import './load-env.js';
 import express from 'express';
 import cors from 'cors';
 import { expressRouter } from '@flowglad/server/express';
@@ -15,12 +15,17 @@ import { tokensRouter } from './routes/tokens.js';
 const app = express();
 const PORT = process.env.PORT ?? 4000;
 const DEMO_MODE = process.env.DEMO_MODE === 'true';
+const FLOWGLAD_SECRET_KEY = process.env.FLOWGLAD_SECRET_KEY;
 
 // Log configuration on startup
 console.log('=== Backend Configuration ===');
 console.log('DEMO_MODE:', DEMO_MODE);
-console.log('FLOWGLAD_SECRET_KEY set:', !!process.env.FLOWGLAD_SECRET_KEY);
-console.log('FLOWGLAD_SECRET_KEY prefix:', process.env.FLOWGLAD_SECRET_KEY?.substring(0, 10) + '...');
+console.log('FLOWGLAD_SECRET_KEY set:', !!FLOWGLAD_SECRET_KEY);
+console.log('FLOWGLAD_SECRET_KEY length:', FLOWGLAD_SECRET_KEY?.length ?? 0);
+console.log('FLOWGLAD_SECRET_KEY prefix:', FLOWGLAD_SECRET_KEY ? `${FLOWGLAD_SECRET_KEY.substring(0, 10)}...` : 'not set');
+if (!DEMO_MODE && !FLOWGLAD_SECRET_KEY) {
+  console.warn('[Config] FLOWGLAD_SECRET_KEY missing and DEMO_MODE is false. Billing endpoints will fail until key is provided.');
+}
 console.log('============================');
 
 app.use(cors({ origin: process.env.FRONTEND_URL ?? 'http://localhost:3000', credentials: true }));

@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { DEMO_MODE, createCheckoutSession as apiCreateCheckoutSession, getEntitlementsData } from '@/lib/api';
+import { createCheckoutSession as apiCreateCheckoutSession, getEntitlementsData } from '@/lib/api';
 
 export type AppBillingValue = {
   loaded: boolean;
@@ -44,17 +44,8 @@ export function AppBillingRoot({ children }: { children: ReactNode }) {
   const [entitlementsLoading, setEntitlementsLoading] = useState(true);
   const [entitlementsError, setEntitlementsError] = useState<string | undefined>(undefined);
   const [subscriptions, setSubscriptions] = useState<AppBillingValue['subscriptions']>([]);
-  const [billingUnavailable, setBillingUnavailable] = useState(false);
 
   const refreshEntitlements = useCallback(async () => {
-    if (DEMO_MODE) {
-      setEntitlements({});
-      setSubscriptions([{ id: 'demo-subscription', status: 'active' }]);
-      setEntitlementsError(undefined);
-      setEntitlementsLoading(false);
-      return;
-    }
-
     setEntitlementsLoading(true);
     setEntitlementsError(undefined);
 
@@ -62,14 +53,13 @@ export function AppBillingRoot({ children }: { children: ReactNode }) {
       const data = await getEntitlementsData();
       setEntitlements(data.entitlements ?? {});
       setSubscriptions(data.billing?.subscriptions ?? []);
-      setBillingUnavailable(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch entitlements';
-      // Keep app usable in local/dev environments if billing is unavailable.
+      // Keep app usable — set error but don't crash. Paid blocks remain locked.
       setEntitlementsError(message);
-      setBillingUnavailable(true);
-      setSubscriptions([{ id: 'fallback-subscription', status: 'active' }]);
-      console.warn('Entitlements unavailable, falling back to unlocked mode:', message);
+      setEntitlements({});
+      setSubscriptions([]);
+      console.warn('Entitlements unavailable; paid blocks remain locked:', message);
     } finally {
       setEntitlementsLoading(false);
     }
@@ -81,11 +71,11 @@ export function AppBillingRoot({ children }: { children: ReactNode }) {
 
   const hasFeatureAccess = useCallback(
     (featureSlug: string) => {
-      if (DEMO_MODE || billingUnavailable) return true;
       if (!featureSlug) return false;
+      if (featureSlug === 'free') return true;
       return Boolean(entitlements[featureSlug]);
     },
-    [entitlements, billingUnavailable]
+    [entitlements]
   );
 
   const createCheckoutSession = useCallback(

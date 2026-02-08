@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import {
   Brain,
-  CheckCircle2,
   Filter,
   Mail,
   PenLine,
@@ -15,13 +16,14 @@ import {
   Type,
   GitBranch,
   Search,
-  RefreshCw,
   Sparkles,
   Wrench,
+  ShoppingCart,
 } from 'lucide-react';
 import { useAppBilling } from '@/contexts/AppBillingContext';
 import { BlockCard } from '@/components/BlockCard';
-import { DEMO_MODE, createCheckoutSession, getProducts } from '@/lib/api';
+import { createCheckoutSession, getProducts } from '@/lib/api';
+import { useCartStore } from '@/store/cartStore';
 import type { BlockDefinition } from 'shared';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -34,23 +36,25 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Layers,
   Type,
   GitBranch,
-  Sparkles,
 };
 
-export default function LibraryPage() {
+function MarketplaceContent() {
   const searchParams = useSearchParams();
   const checkoutStatus = searchParams.get('checkout');
-  const { hasFeatureAccess, entitlementsLoading, refreshEntitlements, entitlementsError } = useAppBilling();
+  const { hasFeatureAccess, refreshEntitlements } = useAppBilling();
 
   const [products, setProducts] = useState<BlockDefinition[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'unlocked' | 'locked'>('all');
   const [kindFilter, setKindFilter] = useState<'all' | 'ai' | 'utility'>('all');
-  const [billingFilter, setBillingFilter] = useState<'all' | 'usage' | 'subscription' | 'included'>('all');
+  const [billingFilter, setBillingFilter] = useState<'all' | 'usage' | 'subscription' | 'purchase' | 'included'>('all');
   const [sortBy, setSortBy] = useState<'featured' | 'name'>('featured');
   const [compactView, setCompactView] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [pageError, setPageError] = useState<string | null>(null);
+  const cartBlockIds = useCartStore((state) => state.blockIds);
+  const addBlockToCart = useCartStore((state) => state.addBlock);
+  const removeBlockFromCart = useCartStore((state) => state.removeBlock);
 
   useEffect(() => {
     let active = true;
@@ -82,14 +86,25 @@ export default function LibraryPage() {
     }
   }, [checkoutStatus, refreshEntitlements]);
 
+  useEffect(() => {
+    if (!products.length) return;
+    for (const product of products) {
+      if (hasFeatureAccess(product.featureSlug)) {
+        removeBlockFromCart(product.id);
+      }
+    }
+  }, [products, hasFeatureAccess, removeBlockFromCart]);
+
   const productsWithMeta = useMemo(() => {
     return products.map((product) => {
-      const hasAccess = DEMO_MODE || hasFeatureAccess(product.featureSlug);
-      const billingType = product.priceSlug.includes('subscription')
-        ? 'subscription'
-        : product.priceSlug.includes('usage')
-          ? 'usage'
-          : 'included';
+      const hasAccess = hasFeatureAccess(product.featureSlug);
+      const billingType = product.priceSlug === 'free'
+        ? 'included'
+        : product.priceSlug.includes('subscription')
+          ? 'subscription'
+          : product.priceSlug.includes('usage')
+            ? 'usage'
+            : 'purchase';
       return {
         product,
         hasAccess,
@@ -127,14 +142,6 @@ export default function LibraryPage() {
       })
       .map(({ product }) => product);
   }, [search, productsWithMeta, statusFilter, kindFilter, billingFilter, sortBy]);
-
-  const stats = useMemo(() => {
-    const total = productsWithMeta.length;
-    const unlocked = productsWithMeta.filter(({ hasAccess }) => hasAccess).length;
-    const aiCount = productsWithMeta.filter(({ product }) => product.usesAI).length;
-    const subscriptionCount = productsWithMeta.filter(({ billingType }) => billingType === 'subscription').length;
-    return { total, unlocked, aiCount, subscriptionCount };
-  }, [productsWithMeta]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -176,164 +183,128 @@ export default function LibraryPage() {
               Discover blocks, apply filters quickly, and unlock tools via checkout only when needed.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void refreshEntitlements()}
-            className="inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
+          <Link
+            href="/cart"
+            className="relative inline-flex items-center justify-center rounded-lg border border-app p-2.5 text-app-soft transition hover:bg-app-surface hover:text-app-fg"
+            aria-label={`Cart${cartBlockIds.length > 0 ? `, ${cartBlockIds.length} items` : ''}`}
           >
-            <RefreshCw className="h-4 w-4" />
-            Refresh access
-          </button>
+            <ShoppingCart className="h-5 w-5" />
+            {cartBlockIds.length > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500 px-1.5 text-xs font-semibold leading-none text-white">
+                {cartBlockIds.length}
+              </span>
+            )}
+          </Link>
         </div>
-
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-app bg-app-card/70 px-3 py-2">
-            <p className="text-xs text-app-soft">Total blocks</p>
-            <p className="mt-1 text-lg font-semibold text-app-fg">{stats.total}</p>
-          </div>
-          <div className="rounded-xl border border-app bg-app-card/70 px-3 py-2">
-            <p className="text-xs text-app-soft">Unlocked</p>
-            <p className="mt-1 text-lg font-semibold text-emerald-300">{stats.unlocked}</p>
-          </div>
-          <div className="rounded-xl border border-app bg-app-card/70 px-3 py-2">
-            <p className="text-xs text-app-soft">AI blocks</p>
-            <p className="mt-1 text-lg font-semibold text-blue-300">{stats.aiCount}</p>
-          </div>
-          <div className="rounded-xl border border-app bg-app-card/70 px-3 py-2">
-            <p className="text-xs text-app-soft">Subscriptions</p>
-            <p className="mt-1 text-lg font-semibold text-amber-300">{stats.subscriptionCount}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-4 flex flex-wrap gap-2 text-xs">
-        {DEMO_MODE ? (
-          <span className="rounded-full border border-emerald-500/35 bg-emerald-500/10 px-3 py-1 text-emerald-300">
-            Demo mode: all blocks unlocked
-          </span>
-        ) : entitlementsLoading ? (
-          <span className="rounded-full border border-app px-3 py-1 text-app-soft">Loading entitlements…</span>
-        ) : entitlementsError ? (
-          <span className="rounded-full border border-rose-500/35 bg-rose-500/10 px-3 py-1 text-rose-300">
-            Entitlements unavailable: {entitlementsError}
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1 rounded-full border border-blue-500/35 bg-blue-500/10 px-3 py-1 text-blue-300">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            Entitlements synced
-          </span>
-        )}
-        {checkoutStatus === 'success' && (
-          <span className="rounded-full border border-emerald-500/35 bg-emerald-500/10 px-3 py-1 text-emerald-300">
-            Checkout complete. Access updated.
-          </span>
-        )}
-        {checkoutStatus === 'cancelled' && (
-          <span className="rounded-full border border-amber-500/35 bg-amber-500/10 px-3 py-1 text-amber-300">
-            Checkout cancelled.
-          </span>
-        )}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
-        <aside className="h-fit rounded-2xl border border-app bg-app-surface/70 p-4">
-          <div className="mb-4 flex items-center justify-between">
-            <p className="inline-flex items-center gap-2 text-sm font-medium text-app-fg">
-              <Filter className="h-4 w-4" />
-              Filters
-            </p>
-            {activeFilterCount > 0 && (
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="text-xs text-app-soft underline-offset-4 hover:text-app-fg hover:underline"
-              >
-                Reset
-              </button>
-            )}
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <p className="mb-2 text-xs uppercase tracking-wide text-app-soft">Access</p>
-              <div className="flex flex-wrap gap-2">
-                {(['all', 'unlocked', 'locked'] as const).map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setStatusFilter(value)}
-                    className={`rounded-full border px-3 py-1 text-xs transition ${statusFilter === value
-                        ? 'border-blue-500/45 bg-blue-500/15 text-blue-300'
-                        : 'border-app text-app-soft hover:text-app-fg'
-                      }`}
-                  >
-                    {value[0].toUpperCase() + value.slice(1)}
-                  </button>
-                ))}
-              </div>
+        <aside className="flex h-fit flex-col gap-4">
+          <div className="rounded-2xl border border-app bg-app-surface/70 p-4">
+            <div className="mb-4 flex items-center justify-between">
+              <p className="inline-flex items-center gap-2 text-sm font-medium text-app-fg">
+                <Filter className="h-4 w-4" />
+                Filters
+              </p>
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="text-xs text-app-soft underline-offset-4 hover:text-app-fg hover:underline"
+                >
+                  Reset
+                </button>
+              )}
             </div>
 
-            <div>
-              <p className="mb-2 text-xs uppercase tracking-wide text-app-soft">Type</p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setKindFilter('all')}
-                  className={`rounded-full border px-3 py-1 text-xs transition ${kindFilter === 'all'
-                      ? 'border-blue-500/45 bg-blue-500/15 text-blue-300'
-                      : 'border-app text-app-soft hover:text-app-fg'
-                    }`}
-                >
-                  All
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setKindFilter('ai')}
-                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition ${kindFilter === 'ai'
-                      ? 'border-blue-500/45 bg-blue-500/15 text-blue-300'
-                      : 'border-app text-app-soft hover:text-app-fg'
-                    }`}
-                >
-                  <Sparkles className="h-3 w-3" />
-                  AI
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setKindFilter('utility')}
-                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition ${kindFilter === 'utility'
-                      ? 'border-emerald-500/45 bg-emerald-500/15 text-emerald-300'
-                      : 'border-app text-app-soft hover:text-app-fg'
-                    }`}
-                >
-                  <Wrench className="h-3 w-3" />
-                  Utility
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs uppercase tracking-wide text-app-soft">Billing</p>
-              <div className="space-y-2">
-                {(
-                  [
-                    ['all', 'All billing'],
-                    ['usage', 'Usage-based'],
-                    ['subscription', 'Subscription'],
-                    ['included', 'Included'],
-                  ] as const
-                ).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setBillingFilter(value)}
-                    className={`block w-full rounded-lg border px-3 py-2 text-left text-xs transition ${billingFilter === value
-                        ? 'border-blue-500/45 bg-blue-500/15 text-blue-300'
-                        : 'border-app text-app-soft hover:text-app-fg'
+            <div className="space-y-4">
+              <div>
+                <p className="mb-2 text-xs uppercase tracking-wide text-app-soft">Access</p>
+                <div className="flex flex-wrap gap-2">
+                  {(['all', 'unlocked', 'locked'] as const).map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setStatusFilter(value)}
+                      className={`rounded-full border px-3 py-1 text-xs transition ${
+                        statusFilter === value
+                          ? 'border-blue-400 dark:border-blue-500/45 bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300'
+                          : 'border-app text-app-soft hover:text-app-fg'
                       }`}
+                    >
+                      {value[0].toUpperCase() + value.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-xs uppercase tracking-wide text-app-soft">Type</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setKindFilter('all')}
+                    className={`rounded-full border px-3 py-1 text-xs transition ${
+                      kindFilter === 'all'
+                        ? 'border-blue-400 dark:border-blue-500/45 bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300'
+                        : 'border-app text-app-soft hover:text-app-fg'
+                    }`}
                   >
-                    {label}
+                    All
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => setKindFilter('ai')}
+                    className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition ${
+                      kindFilter === 'ai'
+                        ? 'border-blue-400 dark:border-blue-500/45 bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300'
+                        : 'border-app text-app-soft hover:text-app-fg'
+                    }`}
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    AI
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setKindFilter('utility')}
+                    className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition ${
+                      kindFilter === 'utility'
+                        ? 'border-emerald-400 dark:border-emerald-500/45 bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                        : 'border-app text-app-soft hover:text-app-fg'
+                    }`}
+                  >
+                    <Wrench className="h-3 w-3" />
+                    Utility
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-xs uppercase tracking-wide text-app-soft">Billing</p>
+                <div className="space-y-2">
+                  {(
+                    [
+                      ['all', 'All billing'],
+                      ['usage', 'Usage-based'],
+                      ['subscription', 'Subscription'],
+                      ['purchase', 'One-time purchase'],
+                      ['included', 'Included'],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setBillingFilter(value)}
+                      className={`block w-full rounded-lg border px-3 py-2 text-left text-xs transition ${
+                        billingFilter === value
+                          ? 'border-blue-400 dark:border-blue-500/45 bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300'
+                          : 'border-app text-app-soft hover:text-app-fg'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -364,10 +335,11 @@ export default function LibraryPage() {
                 <button
                   type="button"
                   onClick={() => setCompactView((prev) => !prev)}
-                  className={`rounded-lg border px-3 py-2 text-sm transition ${compactView
+                  className={`rounded-lg border px-3 py-2 text-sm transition ${
+                    compactView
                       ? 'border-blue-500/45 bg-blue-500/15 text-blue-300'
                       : 'border-app text-app-soft hover:text-app-fg'
-                    }`}
+                  }`}
                 >
                   {compactView ? 'Compact view' : 'Comfort view'}
                 </button>
@@ -378,7 +350,7 @@ export default function LibraryPage() {
           {loadingProducts ? (
             <div className="rounded-xl border border-app bg-app-surface p-6 text-sm text-app-soft">Loading products…</div>
           ) : pageError ? (
-            <div className="rounded-xl border border-rose-500/35 bg-rose-500/10 p-6 text-sm text-rose-300">{pageError}</div>
+            <div className="rounded-xl border border-rose-300 dark:border-rose-500/35 bg-rose-50 dark:bg-rose-500/10 p-6 text-sm text-rose-700 dark:text-rose-300">{pageError}</div>
           ) : filteredProducts.length === 0 ? (
             <div className="rounded-xl border border-app bg-app-surface p-6 text-sm text-app-soft">
               No blocks match your search and filters.
@@ -386,7 +358,7 @@ export default function LibraryPage() {
           ) : (
             <div className={`grid gap-3 ${compactView ? 'sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4' : 'sm:grid-cols-2 xl:grid-cols-3'}`}>
               {filteredProducts.map((block) => {
-                const hasAccess = DEMO_MODE || hasFeatureAccess(block.featureSlug);
+                const hasAccess = hasFeatureAccess(block.featureSlug);
                 const Icon = ICON_MAP[block.icon] ?? Brain;
 
                 return (
@@ -397,6 +369,8 @@ export default function LibraryPage() {
                     hasAccess={hasAccess}
                     compact={compactView}
                     onUnlock={() => handleUnlock(block.priceSlug)}
+                    onAddToCart={hasAccess ? undefined : () => addBlockToCart(block.id)}
+                    inCart={cartBlockIds.includes(block.id)}
                   />
                 );
               })}
@@ -405,5 +379,13 @@ export default function LibraryPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+export default function LibraryPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto w-full max-w-7xl px-4 py-6 text-sm text-app-soft md:px-6 md:py-8">Loading marketplace...</div>}>
+      <MarketplaceContent />
+    </Suspense>
   );
 }

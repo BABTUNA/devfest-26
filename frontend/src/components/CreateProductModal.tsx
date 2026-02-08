@@ -63,7 +63,7 @@ export function CreateProductModal({ onClose, onSuccess }: CreateProductModalPro
             <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-app bg-app-surface shadow-2xl">
                 <div className="flex items-center justify-between border-b border-app p-4">
                     <h2 className="flex items-center gap-2 text-lg font-semibold text-app-fg">
-                        <PackagePlus className="h-5 w-5 text-blue-400" />
+                        <PackagePlus className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                         Create New Agent
                     </h2>
                     <button
@@ -98,7 +98,7 @@ export function CreateProductModal({ onClose, onSuccess }: CreateProductModalPro
                                 value={slug}
                                 onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9_]+/g, '_'))}
                                 placeholder="e.g. resume_optimizer"
-                                className="w-full rounded-lg border border-app bg-app px-3 py-2 text-sm text-blue-300 font-mono focus:border-blue-500 focus:outline-none"
+                                className="w-full rounded-lg border border-app bg-app px-3 py-2 text-sm text-blue-700 dark:text-blue-300 font-mono focus:border-blue-500 focus:outline-none"
                             />
                         </div>
 
@@ -134,7 +134,7 @@ export function CreateProductModal({ onClose, onSuccess }: CreateProductModalPro
                         </div>
 
                         {error && (
-                            <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 p-3 text-sm text-rose-300">
+                            <div className="rounded-lg border border-rose-300 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-300">
                                 {error}
                             </div>
                         )}

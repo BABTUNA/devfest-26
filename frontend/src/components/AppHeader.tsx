@@ -3,21 +3,18 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { FlaskConical, Store, ShoppingCart, User, MoonStar, Sun } from 'lucide-react';
-import { useTheme } from '@/contexts/ThemeContext';
+import { FlaskConical, Store } from 'lucide-react';
 import { TokenBalance } from './TokenBalance';
 import { TokenPurchaseModal } from './TokenPurchaseModal';
+import { UserDropdown } from './UserDropdown';
 
 const NAV = [
   { href: '/marketplace', label: 'Marketplace', icon: Store },
   { href: '/lab', label: 'Lab', icon: FlaskConical },
-  { href: '/cart', label: 'Cart', icon: ShoppingCart },
-  { href: '/profile', label: 'Profile', icon: User },
 ] as const;
 
 export function AppHeader() {
   const pathname = usePathname();
-  const { theme, toggleTheme } = useTheme();
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
 
   return (
@@ -35,10 +32,11 @@ export function AppHeader() {
                 <Link
                   key={href}
                   href={href}
-                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${isActive
-                      ? 'bg-app-accent/20 text-blue-300 dark:text-blue-200'
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                    isActive
+                      ? 'bg-app-accent/20 text-blue-700 dark:text-blue-200'
                       : 'text-app-soft hover:bg-app-surface hover:text-app-fg'
-                    }`}
+                  }`}
                 >
                   <Icon className="h-4 w-4" />
                   {label}
@@ -47,21 +45,9 @@ export function AppHeader() {
             })}
           </nav>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-3">
             <TokenBalance onClick={() => setShowPurchaseModal(true)} />
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="inline-flex items-center gap-2 rounded-lg border border-app px-3 py-2 text-sm text-app-soft transition hover:bg-app-surface hover:text-app-fg"
-              aria-label="Toggle theme"
-              title="Toggle theme"
-            >
-              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <MoonStar className="h-4 w-4" />}
-              <span className="hidden sm:inline">{theme === 'dark' ? 'Light' : 'Dark'}</span>
-            </button>
-            <span className="hidden rounded-lg border border-app px-3 py-2 text-xs text-app-soft md:inline">
-              demo-user-2
-            </span>
+            <UserDropdown />
           </div>
         </div>
       </header>

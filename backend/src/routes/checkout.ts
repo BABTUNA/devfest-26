@@ -1,13 +1,12 @@
 import { Router } from 'express';
 import { flowglad } from '../lib/flowglad.js';
 import { getCustomerExternalId } from '../lib/auth.js';
-import { getBlockById, BLOCK_DEFINITIONS } from 'shared';
+import { BLOCK_DEFINITIONS } from 'shared';
 
 export const checkoutRouter = Router();
 
 const DEMO_MODE = process.env.DEMO_MODE === 'true';
 
-// In-memory store for demo entitlements (replace with DB in production)
 const demoEntitlements = new Map<string, Set<string>>();
 
 export function getDemoEntitlements(userId: string): Set<string> {
@@ -29,37 +28,39 @@ export function grantDemoEntitlement(userId: string, featureSlug: string): void 
 checkoutRouter.post('/', async (req, res) => {
   try {
     const userId = await getCustomerExternalId(req);
-    const { priceSlug, successUrl, cancelUrl } = req.body as {
+    const { priceSlug, priceSlugs, successUrl, cancelUrl, outputName, outputMetadata } = req.body as {
       priceSlug: string;
+      priceSlugs?: string[];
       successUrl: string;
       cancelUrl: string;
+      outputName?: string;
+      outputMetadata?: Record<string, string | number | boolean>;
     };
 
-    console.log(`[Checkout] Request for customer: ${userId}, price: ${priceSlug}`);
+    const candidates = [priceSlug, ...(Array.isArray(priceSlugs) ? priceSlugs : [])].filter(
+      (slug, index, arr): slug is string => typeof slug === 'string' && slug.length > 0 && arr.indexOf(slug) === index
+    );
 
-    if (!priceSlug || !successUrl || !cancelUrl) {
-      return res.status(400).json({ error: 'priceSlug, successUrl, cancelUrl required' });
+    console.log(`[Checkout] Request for customer: ${userId}, prices: ${candidates.join(', ')}`);
+
+    if (!candidates.length || !successUrl || !cancelUrl) {
+      return res.status(400).json({ error: 'priceSlug (or priceSlugs), successUrl, cancelUrl required' });
     }
 
-    // In DEMO_MODE, skip real checkout and grant access directly
     if (DEMO_MODE) {
-      console.log(`[Checkout/Demo] Granting demo access for priceSlug: ${priceSlug}`);
-
-      // Find the block by priceSlug and grant its feature
-      const block = BLOCK_DEFINITIONS.find((b) => b.priceSlug === priceSlug);
-      if (block) {
-        grantDemoEntitlement(userId, block.featureSlug);
-        console.log(`[Checkout/Demo] Granted feature: ${block.featureSlug} to user: ${userId}`);
+      for (const candidate of candidates) {
+        const block = BLOCK_DEFINITIONS.find((b) => b.priceSlug === candidate);
+        if (block) {
+          grantDemoEntitlement(userId, block.featureSlug);
+        }
       }
 
-      // Return success URL so frontend redirects back
       return res.json({
         checkoutSession: {
           id: `demo_session_${Date.now()}`,
           url: successUrl,
         },
         demoMode: true,
-        message: `Demo: Access granted for ${priceSlug}`,
       });
     }
 
@@ -71,55 +72,73 @@ checkoutRouter.post('/', async (req, res) => {
     console.log('[Checkout] Customer ready');
 
     // Step 2: Create checkout session
-    console.log('[Checkout] Creating checkout session for priceSlug:', priceSlug);
+    console.log('[Checkout] Creating checkout session...');
     let result: unknown;
-    try {
-      result = await fgClient.createCheckoutSession({
-        priceSlug,
-        successUrl,
-        cancelUrl,
-      });
-    } catch (checkoutError: unknown) {
-      console.error('[Checkout] Flowglad createCheckoutSession threw:', checkoutError);
-      const errObj = checkoutError as { message?: string; error?: string };
-      return res.status(400).json({
-        error: 'Flowglad checkout failed',
-        details: errObj?.message || errObj?.error || String(checkoutError),
-        hint: `Make sure price slug "${priceSlug}" exists in your Flowglad dashboard`,
+    let selectedPriceSlug: string | null = null;
+    let lastError: unknown = null;
+    for (const candidate of candidates) {
+      try {
+        result = await fgClient.createCheckoutSession({
+          priceSlug: candidate,
+          successUrl,
+          cancelUrl,
+          outputName,
+          outputMetadata,
+        });
+        selectedPriceSlug = candidate;
+        break;
+      } catch (error) {
+        lastError = error;
+        const message =
+          typeof error === 'object' && error && 'message' in error
+            ? String((error as { message?: unknown }).message ?? '')
+            : '';
+        if (!message.toLowerCase().includes('not found')) {
+          throw error;
+        }
+      }
+    }
+
+    if (!selectedPriceSlug) {
+      const fallbackMessage = `Unable to create checkout session. Tried price slugs: ${candidates.join(', ')}`;
+      if (lastError && typeof lastError === 'object') {
+        const message = 'message' in lastError ? String((lastError as { message?: unknown }).message ?? '') : '';
+        throw new Error(message ? `${fallbackMessage}. Last error: ${message}` : fallbackMessage);
+      }
+      throw new Error(fallbackMessage);
+    }
+
+    console.log(`[Checkout] Success with priceSlug="${selectedPriceSlug}"`, JSON.stringify(result, null, 2));
+    const topLevelUrl =
+      typeof result === 'object' && result && 'url' in result
+        ? (result as { url?: unknown }).url
+        : undefined;
+    const rawSession =
+      typeof result === 'object' && result && 'checkoutSession' in result
+        ? (result as { checkoutSession?: unknown }).checkoutSession
+        : result;
+    const sessionUrlFromNested =
+      typeof rawSession === 'object' && rawSession && 'url' in rawSession
+        ? (rawSession as { url?: unknown }).url
+        : undefined;
+    const finalUrl = typeof sessionUrlFromNested === 'string' && sessionUrlFromNested
+      ? sessionUrlFromNested
+      : typeof topLevelUrl === 'string' && topLevelUrl
+        ? topLevelUrl
+        : undefined;
+
+    if (!finalUrl) {
+      return res.status(502).json({
+        error: 'Checkout session missing URL from Flowglad. Verify DEMO_MODE=false, FLOWGLAD_SECRET_KEY, and valid priceSlug.',
       });
     }
 
-    console.log('[Checkout] Raw Flowglad result:', JSON.stringify(result, null, 2));
+    const checkoutSession =
+      rawSession && typeof rawSession === 'object'
+        ? ({ ...(rawSession as Record<string, unknown>), url: finalUrl })
+        : { url: finalUrl };
 
-    // Extract checkout URL from various possible response formats
-    const resultObj = result as Record<string, unknown>;
-    const checkoutSession = resultObj?.checkoutSession as Record<string, unknown> | undefined;
-
-    // Try multiple possible URL field names
-    const checkoutUrl =
-      checkoutSession?.checkoutUrl as string | undefined ??
-      checkoutSession?.url as string | undefined ??
-      resultObj?.checkoutUrl as string | undefined ??
-      resultObj?.url as string | undefined;
-
-    if (!checkoutUrl) {
-      console.error('[Checkout] No checkout URL found in response:', JSON.stringify(result, null, 2));
-      return res.status(500).json({
-        error: 'Checkout URL missing from Flowglad response',
-        details: `The price slug "${priceSlug}" may not exist in your Flowglad dashboard, or the price may not be configured for checkout.`,
-        rawResponse: result,
-      });
-    }
-
-    console.log('[Checkout] Success! Checkout URL:', checkoutUrl);
-
-    // Return normalized response
-    res.json({
-      checkoutSession: {
-        id: checkoutSession?.id ?? resultObj?.id,
-        url: checkoutUrl,
-      },
-    });
+    res.json({ checkoutSession });
   } catch (e: unknown) {
     // Extract detailed error info
     const err = e as { message?: string; error?: { error?: string }; status?: number };

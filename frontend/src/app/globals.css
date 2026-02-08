@@ -2,11 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: dark;
-}
-
 .dark {
+  color-scheme: dark;
   --app-bg: 2 6 23;
   --app-surface: 15 23 42;
   --app-card: 15 23 42;

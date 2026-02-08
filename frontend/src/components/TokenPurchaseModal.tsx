@@ -2,10 +2,62 @@
 
 import { useState } from 'react';
 import { X, Coins, Zap, Calendar, Loader2 } from 'lucide-react';
-import { TOKEN_PACKS, TOKEN_SUBSCRIPTIONS, type TokenPack, type TokenSubscription } from 'shared';
 import { useTokens } from '@/contexts/TokenContext';
+import { API_URL, DEMO_USER_ID } from '@/lib/api';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+// Define token packs locally to avoid import issues
+interface TokenPack {
+    id: string;
+    name: string;
+    tokens: number;
+    priceUsd: number;
+    priceSlug: string;
+}
+
+interface TokenSubscription {
+    id: string;
+    name: string;
+    tokensPerPeriod: number;
+    priceUsd: number;
+    priceSlug: string;
+    interval: 'week' | 'month';
+}
+
+const TOKEN_PACKS: TokenPack[] = [
+    {
+        id: 'starter',
+        name: 'Starter Pack',
+        tokens: 100,
+        priceUsd: 5,
+        priceSlug: 'starter_pack',
+    },
+    {
+        id: 'pro',
+        name: 'Pro Pack',
+        tokens: 500,
+        priceUsd: 20,
+        priceSlug: 'pro_pack',
+    },
+];
+
+const TOKEN_SUBSCRIPTIONS: TokenSubscription[] = [
+    {
+        id: 'monthly',
+        name: 'Monthly Plan',
+        tokensPerPeriod: 200,
+        priceUsd: 10,
+        priceSlug: 'monthly_plan',
+        interval: 'month',
+    },
+    {
+        id: 'weekly',
+        name: 'Weekly Plan',
+        tokensPerPeriod: 50,
+        priceUsd: 3,
+        priceSlug: 'weekly_plan',
+        interval: 'week',
+    },
+];
 
 interface TokenPurchaseModalProps {
     isOpen: boolean;
@@ -19,7 +71,7 @@ export function TokenPurchaseModal({ isOpen, onClose }: TokenPurchaseModalProps)
 
     if (!isOpen) return null;
 
-    const handlePurchase = async (priceSlug: string, productName: string) => {
+    const handlePurchase = async (priceSlug: string) => {
         setLoading(priceSlug);
         setError(null);
 
@@ -28,7 +80,7 @@ export function TokenPurchaseModal({ isOpen, onClose }: TokenPurchaseModalProps)
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-User-Id': 'demo-user-2',
+                    'X-User-Id': DEMO_USER_ID,
                 },
                 body: JSON.stringify({
                     priceSlug,
@@ -40,10 +92,8 @@ export function TokenPurchaseModal({ isOpen, onClose }: TokenPurchaseModalProps)
             const data = await res.json();
 
             if (data.demoMode) {
-                // Demo mode - tokens credited directly
                 await refresh();
                 onClose();
-                alert(`🎉 ${data.tokensAdded} tokens added! New balance: ${data.newBalance}`);
                 return;
             }
 
@@ -52,16 +102,14 @@ export function TokenPurchaseModal({ isOpen, onClose }: TokenPurchaseModalProps)
                 return;
             }
 
-            // Redirect to Flowglad checkout
             const checkoutUrl = data.url ?? data.checkoutSession?.checkoutUrl;
             if (checkoutUrl) {
                 window.location.href = checkoutUrl;
             } else {
                 setError('No checkout URL returned');
             }
-        } catch (e) {
+        } catch {
             setError('Failed to create checkout');
-            console.error(e);
         } finally {
             setLoading(null);
         }
@@ -69,50 +117,47 @@ export function TokenPurchaseModal({ isOpen, onClose }: TokenPurchaseModalProps)
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="relative w-full max-w-lg mx-4 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl">
-                {/* Header */}
-                <div className="flex items-center justify-between p-5 border-b border-zinc-700">
+            <div className="relative mx-4 w-full max-w-lg rounded-2xl border border-app bg-app-surface shadow-2xl">
+                <div className="flex items-center justify-between border-b border-app p-5">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-amber-500/20">
-                            <Coins className="h-5 w-5 text-amber-400" />
+                                        <div className="rounded-lg bg-amber-100 dark:bg-amber-500/20 p-2">
+                            <Coins className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                         </div>
-                        <h2 className="text-lg font-semibold text-white">Buy Tokens</h2>
+                        <h2 className="text-lg font-semibold text-app-fg">Buy Tokens</h2>
                     </div>
-                    <button onClick={onClose} className="p-1 rounded-lg hover:bg-zinc-800 transition">
-                        <X className="h-5 w-5 text-zinc-400" />
+                    <button onClick={onClose} className="rounded-lg p-1 transition hover:bg-app-card">
+                        <X className="h-5 w-5 text-app-soft" />
                     </button>
                 </div>
 
-                {/* Content */}
-                <div className="p-5 space-y-6">
+                <div className="space-y-6 p-5">
                     {error && (
-                        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                        <div className="rounded-lg border border-rose-300 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-300">
                             {error}
                         </div>
                     )}
 
-                    {/* One-time packs */}
                     <div>
-                        <h3 className="flex items-center gap-2 text-sm font-medium text-zinc-400 mb-3">
+                        <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-app-soft">
                             <Zap className="h-4 w-4" />
                             Token Packs (One-time)
                         </h3>
                         <div className="grid gap-3">
-                            {TOKEN_PACKS.map((pack: TokenPack) => (
+                            {TOKEN_PACKS.map((pack) => (
                                 <button
                                     key={pack.id}
-                                    onClick={() => handlePurchase(pack.priceSlug, pack.name)}
+                                    onClick={() => handlePurchase(pack.priceSlug)}
                                     disabled={loading !== null}
-                                    className="flex items-center justify-between p-4 rounded-xl bg-zinc-800 hover:bg-zinc-700/80 border border-zinc-700 hover:border-amber-500/50 transition-all disabled:opacity-50"
+                                    className="flex items-center justify-between rounded-xl border border-app bg-app-card p-4 transition-all hover:border-amber-400 dark:hover:border-amber-500/50 hover:bg-app-card/80 disabled:opacity-50"
                                 >
                                     <div className="text-left">
-                                        <div className="font-medium text-white">{pack.name}</div>
-                                        <div className="text-sm text-amber-400">{pack.tokens.toLocaleString()} tokens</div>
+                                        <div className="font-medium text-app-fg">{pack.name}</div>
+                                        <div className="text-sm text-amber-600 dark:text-amber-400">{pack.tokens.toLocaleString()} tokens</div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className="text-lg font-bold text-white">${pack.priceUsd}</span>
+                                        <span className="text-lg font-bold text-app-fg">${pack.priceUsd}</span>
                                         {loading === pack.priceSlug && (
-                                            <Loader2 className="h-4 w-4 animate-spin text-amber-400" />
+                                            <Loader2 className="h-4 w-4 animate-spin text-amber-600 dark:text-amber-400" />
                                         )}
                                     </div>
                                 </button>
@@ -120,32 +165,31 @@ export function TokenPurchaseModal({ isOpen, onClose }: TokenPurchaseModalProps)
                         </div>
                     </div>
 
-                    {/* Subscriptions */}
                     <div>
-                        <h3 className="flex items-center gap-2 text-sm font-medium text-zinc-400 mb-3">
+                        <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-app-soft">
                             <Calendar className="h-4 w-4" />
                             Subscriptions (Recurring)
                         </h3>
                         <div className="grid gap-3">
-                            {TOKEN_SUBSCRIPTIONS.map((sub: TokenSubscription) => (
+                            {TOKEN_SUBSCRIPTIONS.map((sub) => (
                                 <button
                                     key={sub.id}
-                                    onClick={() => handlePurchase(sub.priceSlug, sub.name)}
+                                    onClick={() => handlePurchase(sub.priceSlug)}
                                     disabled={loading !== null}
-                                    className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-emerald-900/30 to-teal-900/30 hover:from-emerald-900/50 hover:to-teal-900/50 border border-emerald-700/50 hover:border-emerald-500/70 transition-all disabled:opacity-50"
+                                    className="flex items-center justify-between rounded-xl border border-emerald-300 dark:border-emerald-700/50 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/30 dark:to-teal-900/30 p-4 transition-all hover:border-emerald-400 dark:hover:border-emerald-500/70 hover:from-emerald-100 hover:to-teal-100 dark:hover:from-emerald-900/50 dark:hover:to-teal-900/50 disabled:opacity-50"
                                 >
                                     <div className="text-left">
-                                        <div className="font-medium text-white">{sub.name}</div>
-                                        <div className="text-sm text-emerald-400">
+                                        <div className="font-medium text-app-fg">{sub.name}</div>
+                                        <div className="text-sm text-emerald-600 dark:text-emerald-400">
                                             {sub.tokensPerPeriod.toLocaleString()} tokens/{sub.interval}
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className="text-lg font-bold text-white">
+                                        <span className="text-lg font-bold text-app-fg">
                                             ${sub.priceUsd}/{sub.interval === 'month' ? 'mo' : 'wk'}
                                         </span>
                                         {loading === sub.priceSlug && (
-                                            <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+                                            <Loader2 className="h-4 w-4 animate-spin text-emerald-600 dark:text-emerald-400" />
                                         )}
                                     </div>
                                 </button>
@@ -154,9 +198,8 @@ export function TokenPurchaseModal({ isOpen, onClose }: TokenPurchaseModalProps)
                     </div>
                 </div>
 
-                {/* Footer */}
-                <div className="p-5 border-t border-zinc-700 text-center text-xs text-zinc-500">
-                    Tokens are used when running AI agents. Free blocks don&apos;t consume tokens.
+                <div className="border-t border-app p-5 text-center text-xs text-app-soft">
+                    Tokens are used when running AI blocks. Free utility blocks don&apos;t consume tokens.
                 </div>
             </div>
         </div>
